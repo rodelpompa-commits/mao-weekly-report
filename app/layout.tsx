@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,9 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Weekly Accomplishment Report Monitor",
   description: "Online itinerary and accomplishment reporting app for staff monitoring.",
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/icons/mao-weekly-icon.svg",
+    shortcut: "/icons/mao-weekly-icon.svg",
+    apple: "/icons/mao-weekly-icon.svg",
   },
 };
 
@@ -32,6 +35,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <Script id="register-mao-report-service-worker" strategy="afterInteractive">
+          {`if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('/service-worker.js').catch(function () {}); });`}
+        </Script>
       </body>
     </html>
   );
