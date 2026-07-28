@@ -130,6 +130,16 @@
               </select>
             </div>
             <div class="field">
+              <label for="planWorkType">Work Type</label>
+              <select id="planWorkType" required>
+                <option>Regular Work</option>
+                <option>Planning</option>
+                <option>Mapping</option>
+                <option>System Maintenance</option>
+                <option>System Creation</option>
+              </select>
+            </div>
+            <div class="field">
               <label for="planPlace">Place</label>
               <input id="planPlace" type="text" required />
             </div>
@@ -158,6 +168,7 @@
                   <th>Staff</th>
                   <th>Date</th>
                   <th>Program</th>
+                  <th>Work Type</th>
                   <th>Task</th>
                   <th>Place</th>
                   <th>Clients</th>
@@ -201,6 +212,20 @@
               <label for="accomplishmentPercent">Performance</label>
               <input id="accomplishmentPercent" type="number" min="0" max="100" step="5" value="100" required />
             </div>
+            <div class="field">
+              <label for="accomplishmentWorkType">Work Type</label>
+              <select id="accomplishmentWorkType" required>
+                <option>Regular Work</option>
+                <option>Planning</option>
+                <option>Mapping</option>
+                <option>System Maintenance</option>
+                <option>System Creation</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Adjusted Score</label>
+              <div id="adjustedScorePreview" class="grade-preview">100%</div>
+            </div>
             <div class="field wide">
               <label for="accomplishmentOutput">Actual Output / Newly Instructed Task</label>
               <textarea id="accomplishmentOutput" rows="2" required></textarea>
@@ -213,6 +238,15 @@
               <input id="accomplishmentTechnicalAssistance" type="checkbox" />
               Grade this report using the technical-assistance recommendation checklist
             </label>
+            <div class="field full ta-evidence">
+              <label for="taPhotoInput">Technical Assistance Photo and Location</label>
+              <div class="location-actions">
+                <input id="taPhotoInput" type="file" accept="image/*" capture="environment" />
+                <button id="captureLocationBtn" class="subtle-btn" type="button">Use Current Location</button>
+              </div>
+              <div id="locationStatus" class="staff-meta">No location captured yet.</div>
+              <img id="taPhotoPreview" class="photo-preview hidden" alt="Technical assistance evidence preview" />
+            </div>
             <div class="field full">
               <label for="reportDetails">Technical / Operational Report Details</label>
               <textarea id="reportDetails" rows="4" placeholder="Include analytical details from the reporting guide when applicable: inputs used, practices observed, crop condition, pests, yield, constraints, assistance needed, recommendations, and follow-up."></textarea>
@@ -311,7 +345,31 @@
                 <strong id="averageReportGrade">0%</strong>
                 <p>Only technical-assistance reports are included.</p>
               </article>
+              <article class="insight">
+                <span>Plus Factor Earned</span>
+                <strong id="totalPlusFactor">0</strong>
+                <p>Planning, mapping, and system work additions.</p>
+              </article>
+              <article class="insight">
+                <span>Average Adjusted Score</span>
+                <strong id="averageAdjustedScore">0%</strong>
+                <p>Performance rating after approved plus factors.</p>
+              </article>
             </div>
+
+            <section class="chart-card" aria-label="Staff comparative performance graph">
+              <div class="section-heading">
+                <h2>Staff Performance Comparison</h2>
+              </div>
+              <div id="performanceChart" class="performance-chart"></div>
+            </section>
+
+            <section class="chart-card" aria-label="Technical assistance consolidated map">
+              <div class="section-heading">
+                <h2>Technical Assistance Field Map</h2>
+              </div>
+              <div id="fieldMap" class="field-map"></div>
+            </section>
 
             <div class="table-wrap compact-table">
               <table>
@@ -325,6 +383,8 @@
                     <th>Efficiency</th>
                     <th>Boss Task Rating</th>
                     <th>TA Report Grade</th>
+                    <th>Plus Factor</th>
+                    <th>Adjusted Score</th>
                   </tr>
                 </thead>
                 <tbody id="dashboardRows"></tbody>

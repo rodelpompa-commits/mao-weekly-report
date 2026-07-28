@@ -15,6 +15,13 @@ const defaultStaff = [
 ];
 
 const programs = ['Rice', 'HVCC', 'Livestock', 'Fishery', 'Biosystems Engineering'];
+const plusFactors = {
+  'Regular Work': 0,
+  Planning: 5,
+  Mapping: 8,
+  'System Maintenance': 8,
+  'System Creation': 10
+};
 const storageKey = 'weekly-itinerary-accomplishment-monitor-v1';
 const staffStorageKey = 'weekly-accomplishment-staff-v1';
 const signatoryStorageKey = 'weekly-accomplishment-signatories-v1';
@@ -48,7 +55,8 @@ const state = {
   session: { role: '', staffName: '' },
   staffFilter: 'All',
   programFilter: 'All',
-  activeView: 'itineraryView'
+  activeView: 'itineraryView',
+  boundary: null
 };
 
 const els = {
@@ -82,6 +90,7 @@ const els = {
   planStaff: document.querySelector('#planStaff'),
   planDate: document.querySelector('#planDate'),
   planProgram: document.querySelector('#planProgram'),
+  planWorkType: document.querySelector('#planWorkType'),
   planPlace: document.querySelector('#planPlace'),
   planTask: document.querySelector('#planTask'),
   planClients: document.querySelector('#planClients'),
@@ -92,11 +101,21 @@ const els = {
   accomplishmentDate: document.querySelector('#accomplishmentDate'),
   accomplishmentType: document.querySelector('#accomplishmentType'),
   accomplishmentPercent: document.querySelector('#accomplishmentPercent'),
+  accomplishmentWorkType: document.querySelector('#accomplishmentWorkType'),
+  adjustedScorePreview: document.querySelector('#adjustedScorePreview'),
   accomplishmentOutput: document.querySelector('#accomplishmentOutput'),
   accomplishmentJustification: document.querySelector('#accomplishmentJustification'),
   accomplishmentTechnicalAssistance: document.querySelector('#accomplishmentTechnicalAssistance'),
+  taPhotoInput: document.querySelector('#taPhotoInput'),
+  captureLocationBtn: document.querySelector('#captureLocationBtn'),
+  locationStatus: document.querySelector('#locationStatus'),
+  taPhotoPreview: document.querySelector('#taPhotoPreview'),
   reportDetails: document.querySelector('#reportDetails'),
   reportGradePreview: document.querySelector('#reportGradePreview'),
+  totalPlusFactor: document.querySelector('#totalPlusFactor'),
+  averageAdjustedScore: document.querySelector('#averageAdjustedScore'),
+  performanceChart: document.querySelector('#performanceChart'),
+  fieldMap: document.querySelector('#fieldMap'),
   adminModal: document.querySelector('#adminModal'),
   staffNamesInput: document.querySelector('#staffNamesInput'),
   staffPasswordInput: document.querySelector('#staffPasswordInput'),
@@ -170,6 +189,26 @@ function reportGradeText(plan) {
   return `${grade}%`;
 }
 
+function plusFactorFor(plan) {
+  return plusFactors[plan.workType || 'Regular Work'] || 0;
+}
+
+function earnedPlusFactor(plan) {
+  if (!plan.accomplishmentType || plan.accomplishmentType === 'Not Conducted - Justified') return 0;
+  return plusFactorFor(plan);
+}
+
+function adjustedScore(plan) {
+  if (!plan.accomplishmentType || plan.accomplishmentType === 'Not Conducted - Justified') return 0;
+  const base = Number(plan.accomplishmentPercent || 0);
+  return Math.min(100, base + earnedPlusFactor(plan));
+}
+
+function adjustedScoreText(plan) {
+  if (!plan.accomplishmentType) return 'Pending';
+  return `${adjustedScore(plan)}% (+${earnedPlusFactor(plan)})`;
+}
+
 function createId(index = 0) {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
     return globalThis.crypto.randomUUID();
@@ -228,6 +267,7 @@ function samplePlans() {
     weekEnd: els.weekEnd.value,
     datePlanned: addDays(weekStart, item[1]),
     program: item[2],
+    workType: index === 0 ? 'Planning' : index === 4 ? 'Mapping' : 'Regular Work',
     place: item[3],
     task: item[4],
     clients: item[5],
@@ -372,7 +412,12 @@ function ratingStats(plans) {
   const averageReportGrade = accomplishedReports.length
     ? Math.round(accomplishedReports.reduce((sum, plan) => sum + reportGrade(plan), 0) / accomplishedReports.length)
     : null;
-  return { ratedPlanned, conducted, justified, missing, bossChanges, efficiency, bossRating, averageReportGrade };
+  const scoredPlans = plans.filter((plan) => plan.accomplishmentType);
+  const totalPlus = scoredPlans.reduce((sum, plan) => sum + earnedPlusFactor(plan), 0);
+  const averageAdjusted = scoredPlans.length
+    ? Math.round(scoredPlans.reduce((sum, plan) => sum + adjustedScore(plan), 0) / scoredPlans.length)
+    : 0;
+  return { ratedPlanned, conducted, justified, missing, bossChanges, efficiency, bossRating, averageReportGrade, totalPlus, averageAdjusted };
 }
 
 function statusLabel(plan) {
@@ -384,9 +429,9 @@ function statusLabel(plan) {
 
 function ratingEffect(plan) {
   if (!plan.accomplishmentType) return 'Pending encoding';
-  if (plan.accomplishmentType === 'Conducted') return `Rated as conducted (${plan.accomplishmentPercent || 100}%)`;
+  if (plan.accomplishmentType === 'Conducted') return `Rated as conducted (${plan.accomplishmentPercent || 100}%), adjusted ${adjustedScoreText(plan)}`;
   if (plan.accomplishmentType === 'Boss Instruction') {
-    return `No penalty on planned task. New task rated ${plan.accomplishmentPercent || 0}%.`;
+    return `No penalty on planned task. New task adjusted ${adjustedScoreText(plan)}.`;
   }
   return 'Counted as not conducted; justification required.';
 }
@@ -403,6 +448,8 @@ function renderMetrics() {
   els.bossInstructionCount.textContent = stats.bossChanges.length;
   els.bossTaskRating.textContent = `${stats.bossRating}%`;
   els.averageReportGrade.textContent = stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`;
+  els.totalPlusFactor.textContent = stats.totalPlus;
+  els.averageAdjustedScore.textContent = `${stats.averageAdjusted}%`;
 }
 
 function renderPlanRows() {
@@ -428,6 +475,7 @@ function renderPlanRows() {
       <td>${escapeHtml(plan.staffName)}</td>
       <td>${escapeHtml(plan.datePlanned)}</td>
       <td>${escapeHtml(plan.program)}</td>
+      <td>${escapeHtml(plan.workType || 'Regular Work')}</td>
       <td>${escapeHtml(plan.task)}</td>
       <td>${escapeHtml(plan.place)}</td>
       <td>${escapeHtml(plan.clients || '')}</td>
@@ -455,6 +503,9 @@ function renderAccomplishmentRows() {
     const accomplishment = plan.accomplishmentType
       ? `${escapeHtml(plan.accomplishmentOutput || '')}<div class="staff-meta">${escapeHtml(plan.justification || '')}</div>`
       : '<span class="staff-meta">Waiting for accomplishment entry</span>';
+    const evidence = plan.technicalAssistance && (plan.taLatitude || plan.taPhotoData)
+      ? `<div class="staff-meta">Evidence: ${plan.taLatitude && plan.taLongitude ? `${Number(plan.taLatitude).toFixed(5)}, ${Number(plan.taLongitude).toFixed(5)}` : 'photo attached'}</div>`
+      : '';
     const reportReference = [
       escapeHtml(plan.reportDetails || ''),
       plan.technicalAssistance && plan.reportItems && plan.reportItems.length
@@ -470,7 +521,7 @@ function renderAccomplishmentRows() {
       <td>${escapeHtml(plan.task)}</td>
       <td>${escapeHtml(plan.place)}</td>
       <td>${escapeHtml(plan.program)}</td>
-      <td>${accomplishment}</td>
+      <td>${accomplishment}${evidence}</td>
       <td>${reportReference}</td>
       <td>${gradeHtml}</td>
       <td>${escapeHtml(ratingEffect(plan))}</td>
@@ -500,6 +551,8 @@ function renderDashboard() {
       <td>${stats.efficiency}%</td>
       <td>${stats.bossRating}%</td>
       <td>${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}</td>
+      <td>${stats.totalPlus}</td>
+      <td>${stats.averageAdjusted}%</td>
     `;
     els.dashboardRows.append(row);
 
@@ -511,10 +564,117 @@ function renderDashboard() {
         <span class="staff-meta">${stats.conducted.length}/${stats.ratedPlanned.length} conducted</span>
       </div>
       <div class="bar" aria-label="${escapeHtml(name)} efficiency ${stats.efficiency}%"><span style="width: ${stats.efficiency}%"></span></div>
-      <div class="staff-meta">${stats.bossChanges.length} boss-instructed change(s), boss task rating ${stats.bossRating}%, report grade ${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}</div>
+      <div class="staff-meta">${stats.bossChanges.length} boss-instructed change(s), boss task rating ${stats.bossRating}%, report grade ${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}, adjusted score ${stats.averageAdjusted}%</div>
     `;
     els.staffList.append(item);
   });
+  renderPerformanceChart();
+  renderFieldMap();
+}
+
+function staffChartData() {
+  return state.staff.map((name) => {
+    const stats = ratingStats(filteredPlans().filter((plan) => plan.staffName === name));
+    return { name, efficiency: stats.efficiency, adjusted: stats.averageAdjusted };
+  }).filter((item) => item.efficiency || item.adjusted);
+}
+
+function renderPerformanceChart() {
+  if (!els.performanceChart) return;
+  const data = staffChartData();
+  if (!data.length) {
+    els.performanceChart.innerHTML = '<p class="empty-state">No staff scores yet for the selected week.</p>';
+    return;
+  }
+  const width = Math.max(680, data.length * 88);
+  const height = 320;
+  const top = 28;
+  const bottom = 78;
+  const left = 44;
+  const chartHeight = height - top - bottom;
+  const barSlot = (width - left - 24) / data.length;
+  const bars = data.map((item, index) => {
+    const x = left + index * barSlot + 14;
+    const effHeight = (item.efficiency / 100) * chartHeight;
+    const adjHeight = (item.adjusted / 100) * chartHeight;
+    return `
+      <rect class="chart-bar efficiency" x="${x}" y="${top + chartHeight - effHeight}" width="22" height="${effHeight}"></rect>
+      <rect class="chart-bar adjusted" x="${x + 26}" y="${top + chartHeight - adjHeight}" width="22" height="${adjHeight}"></rect>
+      <text class="chart-value" x="${x + 24}" y="${top + chartHeight - Math.max(effHeight, adjHeight) - 8}" text-anchor="middle">${item.adjusted}%</text>
+      <text class="chart-label" x="${x + 24}" y="${height - 42}" text-anchor="middle">${escapeHtml(item.name.split(' ')[0])}</text>
+    `;
+  }).join('');
+  els.performanceChart.innerHTML = `
+    <div class="chart-scroll">
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Comparative staff performance chart">
+        <line class="chart-axis" x1="${left}" y1="${top + chartHeight}" x2="${width - 16}" y2="${top + chartHeight}"></line>
+        <line class="chart-axis" x1="${left}" y1="${top}" x2="${left}" y2="${top + chartHeight}"></line>
+        <text class="chart-tick" x="12" y="${top + 5}">100%</text>
+        <text class="chart-tick" x="18" y="${top + chartHeight + 4}">0%</text>
+        ${bars}
+      </svg>
+    </div>
+    <div class="chart-legend"><span><i class="legend-efficiency"></i>Efficiency</span><span><i class="legend-adjusted"></i>Adjusted score</span></div>
+  `;
+}
+
+function boundaryCoordinates() {
+  if (!state.boundary || !Array.isArray(state.boundary.features)) return [];
+  return state.boundary.features.flatMap((feature) => feature.geometry.coordinates);
+}
+
+function renderFieldMap() {
+  if (!els.fieldMap) return;
+  const rings = boundaryCoordinates();
+  const points = filteredPlans().filter((plan) => plan.technicalAssistance && plan.taLatitude && plan.taLongitude);
+  if (!rings.length) {
+    els.fieldMap.innerHTML = '<p class="empty-state">Boundary map is loading.</p>';
+    return;
+  }
+  const allCoords = rings.flat();
+  points.forEach((plan) => allCoords.push([Number(plan.taLongitude), Number(plan.taLatitude)]));
+  const xs = allCoords.map((coord) => coord[0]);
+  const ys = allCoords.map((coord) => coord[1]);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const width = 760;
+  const height = 460;
+  const pad = 24;
+  const scale = (coord) => {
+    const x = pad + ((coord[0] - minX) / (maxX - minX || 1)) * (width - pad * 2);
+    const y = height - pad - ((coord[1] - minY) / (maxY - minY || 1)) * (height - pad * 2);
+    return [x, y];
+  };
+  const paths = rings.map((ring) => {
+    const d = ring.map((coord, index) => {
+      const [x, y] = scale(coord);
+      return `${index ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(' ');
+    return `<path class="boundary-path" d="${d} Z"></path>`;
+  }).join('');
+  const pins = points.map((plan) => {
+    const [x, y] = scale([Number(plan.taLongitude), Number(plan.taLatitude)]);
+    return `<g class="map-pin" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle r="6"></circle><title>${escapeHtml(plan.staffName)} - ${escapeHtml(plan.accomplishmentOutput || plan.task)}</title></g>`;
+  }).join('');
+  const list = points.length
+    ? points.map((plan) => `
+        <article class="map-evidence">
+          ${plan.taPhotoData ? `<img src="${plan.taPhotoData}" alt="Field evidence from ${escapeHtml(plan.staffName)}" />` : ''}
+          <div><strong>${escapeHtml(plan.staffName)}</strong><span>${escapeHtml(plan.accomplishmentDate || plan.datePlanned)} | ${Number(plan.taLatitude).toFixed(5)}, ${Number(plan.taLongitude).toFixed(5)}</span><p>${escapeHtml(plan.accomplishmentOutput || plan.task)}</p></div>
+        </article>
+      `).join('')
+    : '<p class="empty-state">No technical assistance location evidence yet for the selected week.</p>';
+  els.fieldMap.innerHTML = `
+    <div class="map-canvas">
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Consolidated technical assistance locations inside Pinamalayan boundary">
+        ${paths}
+        ${pins}
+      </svg>
+    </div>
+    <div class="map-evidence-list">${list}</div>
+  `;
 }
 
 function updateReportGradePreview() {
@@ -525,6 +685,80 @@ function updateReportGradePreview() {
   };
   els.reportGradePreview.textContent = reportGradeText(tempPlan);
   els.reportGradePreview.className = `grade-preview ${reportGradeClass(reportGrade(tempPlan))}`;
+}
+
+function updateAdjustedScorePreview() {
+  const tempPlan = {
+    accomplishmentType: els.accomplishmentType.value,
+    accomplishmentPercent: Number(els.accomplishmentPercent.value || 0),
+    workType: els.accomplishmentWorkType.value
+  };
+  els.adjustedScorePreview.textContent = adjustedScoreText(tempPlan);
+}
+
+function setLocationStatus(lat, lng, capturedAt = new Date().toISOString()) {
+  els.locationStatus.dataset.lat = lat || '';
+  els.locationStatus.dataset.lng = lng || '';
+  els.locationStatus.dataset.capturedAt = capturedAt || '';
+  els.locationStatus.textContent = lat && lng
+    ? `Location captured: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
+    : 'No location captured yet.';
+}
+
+function setPhotoPreview(dataUrl = '') {
+  els.taPhotoPreview.dataset.photoData = dataUrl;
+  els.taPhotoPreview.src = dataUrl;
+  els.taPhotoPreview.classList.toggle('hidden', !dataUrl);
+}
+
+function resizePhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error('Unable to read image.'));
+      image.onload = () => {
+        const maxSize = 900;
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const context = canvas.getContext('2d');
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function captureCurrentLocation() {
+  if (!navigator.geolocation) {
+    els.locationStatus.textContent = 'Location is not available on this device/browser.';
+    return;
+  }
+  els.locationStatus.textContent = 'Getting current location...';
+  navigator.geolocation.getCurrentPosition(
+    (position) => setLocationStatus(position.coords.latitude, position.coords.longitude),
+    () => {
+      els.locationStatus.textContent = 'Location permission was denied or unavailable.';
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+  );
+}
+
+function loadBoundary() {
+  fetch('pinamalayan-boundary.json')
+    .then((response) => response.json())
+    .then((geojson) => {
+      state.boundary = geojson;
+      renderFieldMap();
+    })
+    .catch(() => {
+      if (els.fieldMap) els.fieldMap.innerHTML = '<p class="empty-state">Boundary map could not be loaded.</p>';
+    });
 }
 
 function applyAccessRules() {
@@ -576,6 +810,7 @@ function showPlanForm(plan = null) {
     els.planStaff.value = plan.staffName;
     els.planDate.value = plan.datePlanned;
     els.planProgram.value = plan.program;
+    els.planWorkType.value = plan.workType || 'Regular Work';
     els.planPlace.value = plan.place;
     els.planTask.value = plan.task;
     els.planClients.value = plan.clients || '';
@@ -584,6 +819,7 @@ function showPlanForm(plan = null) {
     els.planForm.reset();
     els.planId.value = '';
     els.planDate.value = els.weekStart.value;
+    els.planWorkType.value = 'Regular Work';
     if (isStaff()) els.planStaff.value = state.session.staffName;
   }
   els.planStaff.disabled = isStaff() && !isAdmin();
@@ -609,6 +845,7 @@ function savePlan(event) {
     weekEnd: els.weekEnd.value,
     datePlanned: els.planDate.value,
     program: els.planProgram.value,
+    workType: els.planWorkType.value,
     place: els.planPlace.value.trim(),
     task: els.planTask.value.trim(),
     clients: els.planClients.value.trim(),
@@ -637,6 +874,7 @@ function showAccomplishmentForm(plan = null) {
     weekStart: els.weekStart.value,
     weekEnd: els.weekEnd.value,
     program: programs[0],
+    workType: 'Regular Work',
     task: 'New task instructed by the Boss',
     place: '',
     clients: ''
@@ -648,15 +886,20 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentDate.value = target.accomplishmentDate || target.datePlanned || els.weekStart.value;
   els.accomplishmentType.value = target.accomplishmentType || (plan ? 'Conducted' : 'Boss Instruction');
   els.accomplishmentPercent.value = target.accomplishmentPercent ?? 100;
+  els.accomplishmentWorkType.value = target.workType || 'Regular Work';
   els.accomplishmentOutput.value = target.accomplishmentOutput || target.task || '';
   els.accomplishmentJustification.value = target.justification || '';
   els.accomplishmentTechnicalAssistance.checked = Boolean(target.technicalAssistance);
   els.reportDetails.value = target.reportDetails || '';
+  setLocationStatus(target.taLatitude || '', target.taLongitude || '', target.taLocationCapturedAt || '');
+  setPhotoPreview(target.taPhotoData || '');
+  els.taPhotoInput.value = '';
   reportItemInputs().forEach((input) => {
     input.checked = Array.isArray(target.reportItems) && target.reportItems.includes(input.value);
   });
   els.accomplishmentStaff.disabled = isStaff() && !isAdmin();
   updateReportGradePreview();
+  updateAdjustedScorePreview();
   if (!plan) {
     savePlans();
     renderAll();
@@ -669,7 +912,10 @@ function hideAccomplishmentForm() {
   els.accomplishmentForm.reset();
   els.accomplishmentPlanId.value = '';
   els.accomplishmentStaff.disabled = false;
+  setLocationStatus('', '', '');
+  setPhotoPreview('');
   updateReportGradePreview();
+  updateAdjustedScorePreview();
 }
 
 function saveAccomplishment(event) {
@@ -689,11 +935,16 @@ function saveAccomplishment(event) {
   plan.accomplishmentDate = els.accomplishmentDate.value;
   plan.accomplishmentType = type;
   plan.accomplishmentPercent = Number(els.accomplishmentPercent.value);
+  plan.workType = els.accomplishmentWorkType.value;
   plan.accomplishmentOutput = els.accomplishmentOutput.value.trim();
   plan.justification = justification;
   plan.technicalAssistance = els.accomplishmentTechnicalAssistance.checked;
   plan.reportDetails = els.reportDetails.value.trim();
   plan.reportItems = plan.technicalAssistance ? selectedReportItems() : [];
+  plan.taLatitude = plan.technicalAssistance ? els.locationStatus.dataset.lat || '' : '';
+  plan.taLongitude = plan.technicalAssistance ? els.locationStatus.dataset.lng || '' : '';
+  plan.taLocationCapturedAt = plan.technicalAssistance ? els.locationStatus.dataset.capturedAt || '' : '';
+  plan.taPhotoData = plan.technicalAssistance ? els.taPhotoPreview.dataset.photoData || '' : '';
   if (type === 'Boss Instruction' && plan.task === 'New task instructed by the Boss') {
     plan.task = plan.accomplishmentOutput;
     plan.program = plan.program || programs[0];
@@ -782,11 +1033,12 @@ function exportCsv() {
     ['Week Start', els.weekStart.value],
     ['Week End', els.weekEnd.value],
     [],
-    ['Staff', 'Planned Date', 'Program', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Justification / Boss Instruction', 'Technical / Operational Details', 'Report Checklist', 'TA Report Grade', 'Rating Effect'],
+    ['Staff', 'Planned Date', 'Program', 'Work Type', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Plus Factor', 'Adjusted Score', 'Latitude', 'Longitude', 'Justification / Boss Instruction', 'Technical / Operational Details', 'Report Checklist', 'TA Report Grade', 'Rating Effect'],
     ...filteredPlans().map((plan) => [
       plan.staffName,
       plan.datePlanned,
       plan.program,
+      plan.workType || 'Regular Work',
       plan.task,
       plan.place,
       plan.clients,
@@ -795,6 +1047,10 @@ function exportCsv() {
       plan.accomplishmentDate || '',
       plan.accomplishmentOutput || '',
       plan.accomplishmentPercent === undefined ? '' : `${plan.accomplishmentPercent}%`,
+      earnedPlusFactor(plan),
+      plan.accomplishmentType ? `${adjustedScore(plan)}%` : '',
+      plan.taLatitude || '',
+      plan.taLongitude || '',
       plan.justification || '',
       plan.reportDetails || '',
       (plan.reportItems || []).join('; '),
@@ -897,6 +1153,23 @@ function bindEvents() {
   reportItemInputs().forEach((input) => input.addEventListener('change', updateReportGradePreview));
   els.reportDetails.addEventListener('input', updateReportGradePreview);
   els.accomplishmentTechnicalAssistance.addEventListener('change', updateReportGradePreview);
+  els.accomplishmentType.addEventListener('change', updateAdjustedScorePreview);
+  els.accomplishmentPercent.addEventListener('input', updateAdjustedScorePreview);
+  els.accomplishmentWorkType.addEventListener('change', updateAdjustedScorePreview);
+  els.captureLocationBtn.addEventListener('click', captureCurrentLocation);
+  els.taPhotoInput.addEventListener('change', async (event) => {
+    const [file] = event.target.files || [];
+    if (!file) {
+      setPhotoPreview('');
+      return;
+    }
+    try {
+      setPhotoPreview(await resizePhoto(file));
+    } catch {
+      alert('The photo could not be attached. Please try another image.');
+      setPhotoPreview('');
+    }
+  });
   document.querySelector('#resetBtn').addEventListener('click', () => {
     if (!confirm('Restore sample itinerary and accomplishment records?')) return;
     state.plans = samplePlans();
@@ -928,4 +1201,5 @@ loadSession();
 populateStaffSelects();
 loadPlans();
 bindEvents();
+loadBoundary();
 renderAll();
