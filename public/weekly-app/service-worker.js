@@ -1,4 +1,4 @@
-const cacheName = 'mao-weekly-report-v4';
+const cacheName = 'mao-weekly-report-v5';
 const appFiles = [
   './',
   './index.html',
@@ -23,6 +23,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  const requestUrl = new URL(event.request.url);
+  if (event.request.mode === 'navigate' && requestUrl.pathname.endsWith('/weekly-app/index.html')) {
+    event.respondWith(Response.redirect('/', 302));
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request).catch(() => caches.match('./index.html')))
   );
