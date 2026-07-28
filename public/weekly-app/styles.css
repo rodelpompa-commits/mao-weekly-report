@@ -621,6 +621,29 @@ tbody tr:hover {
   overflow: auto;
 }
 
+.map-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.map-toolbar button {
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.interactive-map {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.interactive-map.is-panning {
+  cursor: grabbing;
+}
+
 .boundary-path {
   fill: #eaf4ff;
   stroke: #1267b1;

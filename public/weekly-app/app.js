@@ -96,7 +96,9 @@ const state = {
   staffFilter: 'All',
   programFilter: 'All',
   activeView: 'itineraryView',
-  boundary: null
+  boundary: null,
+  mapView: null,
+  mapDrag: null
 };
 
 const els = {
@@ -764,6 +766,48 @@ function boundaryCoordinates() {
   return state.boundary.features.flatMap((feature) => feature.geometry.coordinates);
 }
 
+function resetMapView() {
+  state.mapView = { x: 0, y: 0, width: 760, height: 460 };
+  applyMapView();
+}
+
+function applyMapView() {
+  const svg = document.querySelector('.interactive-map');
+  if (!svg || !state.mapView) return;
+  const view = state.mapView;
+  svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.width} ${view.height}`);
+}
+
+function zoomFieldMap(factor) {
+  if (!state.mapView) state.mapView = { x: 0, y: 0, width: 760, height: 460 };
+  const view = state.mapView;
+  const nextWidth = Math.max(120, Math.min(760, view.width * factor));
+  const nextHeight = Math.max(72, Math.min(460, view.height * factor));
+  const centerX = view.x + view.width / 2;
+  const centerY = view.y + view.height / 2;
+  state.mapView = {
+    x: Math.max(0, Math.min(760 - nextWidth, centerX - nextWidth / 2)),
+    y: Math.max(0, Math.min(460 - nextHeight, centerY - nextHeight / 2)),
+    width: nextWidth,
+    height: nextHeight
+  };
+  applyMapView();
+}
+
+function panFieldMap(deltaX, deltaY, svg) {
+  if (!state.mapView || !svg) return;
+  const rect = svg.getBoundingClientRect();
+  const view = state.mapView;
+  const moveX = (deltaX / rect.width) * view.width;
+  const moveY = (deltaY / rect.height) * view.height;
+  state.mapView = {
+    ...view,
+    x: Math.max(0, Math.min(760 - view.width, view.x - moveX)),
+    y: Math.max(0, Math.min(460 - view.height, view.y - moveY))
+  };
+  applyMapView();
+}
+
 function renderFieldMap() {
   if (!els.fieldMap) return;
   const rings = boundaryCoordinates();
@@ -782,6 +826,8 @@ function renderFieldMap() {
   const maxY = Math.max(...ys);
   const width = 760;
   const height = 460;
+  if (!state.mapView) state.mapView = { x: 0, y: 0, width, height };
+  const mapView = state.mapView;
   const pad = 24;
   const scale = (coord) => {
     const x = pad + ((coord[0] - minX) / (maxX - minX || 1)) * (width - pad * 2);
@@ -808,8 +854,14 @@ function renderFieldMap() {
       `).join('')
     : '<p class="empty-state">No technical assistance location evidence yet for the selected week.</p>';
   els.fieldMap.innerHTML = `
+    <div class="map-toolbar" aria-label="Map controls">
+      <button class="subtle-btn" type="button" data-map-action="zoom-in">Zoom In</button>
+      <button class="subtle-btn" type="button" data-map-action="zoom-out">Zoom Out</button>
+      <button class="subtle-btn" type="button" data-map-action="reset">Reset</button>
+      <span class="staff-meta">Drag the map to pan.</span>
+    </div>
     <div class="map-canvas">
-      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Consolidated technical assistance locations inside Pinamalayan boundary">
+      <svg class="interactive-map" viewBox="${mapView.x} ${mapView.y} ${mapView.width} ${mapView.height}" role="img" aria-label="Consolidated technical assistance locations inside Pinamalayan boundary">
         ${paths}
         ${pins}
       </svg>
@@ -1440,6 +1492,13 @@ function bindEvents() {
     renderAll();
   });
   document.body.addEventListener('click', (event) => {
+    const mapButton = event.target.closest('button[data-map-action]');
+    if (mapButton) {
+      if (mapButton.dataset.mapAction === 'zoom-in') zoomFieldMap(0.72);
+      if (mapButton.dataset.mapAction === 'zoom-out') zoomFieldMap(1.28);
+      if (mapButton.dataset.mapAction === 'reset') resetMapView();
+      return;
+    }
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const plan = state.plans.find((item) => item.id === button.dataset.id);
@@ -1457,6 +1516,35 @@ function bindEvents() {
       removeAccomplishment(plan);
     }
   });
+  document.body.addEventListener('pointerdown', (event) => {
+    const svg = event.target.closest('.interactive-map');
+    if (!svg) return;
+    state.mapDrag = { x: event.clientX, y: event.clientY, svg };
+    svg.classList.add('is-panning');
+    svg.setPointerCapture(event.pointerId);
+  });
+  document.body.addEventListener('pointermove', (event) => {
+    if (!state.mapDrag) return;
+    const deltaX = event.clientX - state.mapDrag.x;
+    const deltaY = event.clientY - state.mapDrag.y;
+    state.mapDrag.x = event.clientX;
+    state.mapDrag.y = event.clientY;
+    panFieldMap(deltaX, deltaY, state.mapDrag.svg);
+  });
+  document.body.addEventListener('pointerup', (event) => {
+    const svg = state.mapDrag && state.mapDrag.svg;
+    if (svg) {
+      svg.classList.remove('is-panning');
+      if (svg.releasePointerCapture) svg.releasePointerCapture(event.pointerId);
+    }
+    state.mapDrag = null;
+  });
+  document.body.addEventListener('wheel', (event) => {
+    const svg = event.target.closest('.interactive-map');
+    if (!svg) return;
+    event.preventDefault();
+    zoomFieldMap(event.deltaY < 0 ? 0.86 : 1.14);
+  }, { passive: false });
 }
 
 setDefaultDates();
