@@ -1,18 +1,31 @@
-const defaultStaff = [
-  'Rodel L. Pompa',
-  'John Aldrich R. Vinzon',
-  'Mila D. Lim',
-  'Richelle M. Degala',
-  'Eng. Hidy C. Flores',
-  'Kristine Joy M. Torres',
-  'Mellette B. Musico',
-  'Rose Ann O. Marasigan',
-  'Lorie May S. Tabilisma',
-  'Jess Mark R. Macalalad',
-  'Aleckz Andrea Rose M. Marayan',
-  'Kezzer G. Fabregas',
-  'Dra. Ithiel M. Maalihan'
+const officialRosterVersion = '2026-official-staff-01';
+const officialStaffAccounts = [
+  { name: 'Rodel L. Pompa', password: '1001' },
+  { name: 'John Aldrich R. Vinzon', password: '1002' },
+  { name: 'Mila D. Lim', password: '1003' },
+  { name: 'Richelle M. Degala', password: '1004' },
+  { name: 'Eng. Hidy C. Flores', password: '1005' },
+  { name: 'Kristine Joy M. Torres', password: '1006' },
+  { name: 'Mellette B. Musico', password: '1007' },
+  { name: 'Rose Ann O. Marasigan', password: '1008' },
+  { name: 'Lorie May S. Tabilisma', password: '1009' },
+  { name: 'Jess Mark R. Macalalad', password: '1010' },
+  { name: 'Aleckz Andrea Rose M. Marayan', password: '1011' },
+  { name: 'Kezzer G. Fabregas', password: '1012' },
+  { name: 'Dra. Ithiel M. Maalihan', password: '1013' },
+  { name: 'Robert A. Merabete, Jr.', password: '1014' },
+  { name: 'Richman M. Bugarin', password: '1015' },
+  { name: 'Princess Joy C. Villarba', password: '1016' },
+  { name: 'Joshua Vargas', password: '1017' },
+  { name: 'Diana Rose Pedragoza', password: '1018' },
+  { name: 'Jaime M. Cupiado', password: '1019' },
+  { name: 'Aquilito S. Constantino', password: '1020' },
+  { name: 'Junnel F. Hernandez', password: '1021' },
+  { name: 'Elias G. Burgos', password: '1022' },
+  { name: 'Cheridan M. Faildo', password: '1023' },
+  { name: 'Melanio O. Mapacpac', password: '1024' }
 ];
+const defaultStaff = officialStaffAccounts.map((account) => account.name);
 
 const programs = ['Rice', 'HVCC', 'Livestock', 'Fishery', 'Biosystems Engineering'];
 const plusFactors = {
@@ -38,10 +51,11 @@ const defaultSignatories = {
 };
 
 const defaultAccess = {
-  staffPassword: 'staff123',
-  adminPassword: 'admin123',
+  rosterVersion: officialRosterVersion,
+  staffPassword: '1001',
+  adminPassword: 'mao2026',
   viewerPassword: 'viewer123',
-  staffAccounts: defaultStaff.map((name) => ({ name, password: 'staff123' })),
+  staffAccounts: officialStaffAccounts.map((account) => ({ ...account })),
   staffCanPlan: true,
   staffCanAccomplish: true,
   staffCanBossTask: false
@@ -328,6 +342,15 @@ function renderSignatories() {
 function loadAccess() {
   const stored = localStorage.getItem(accessStorageKey);
   state.access = { ...defaultAccess, ...(stored ? JSON.parse(stored) : {}) };
+  if (state.access.rosterVersion !== officialRosterVersion) {
+    state.access.rosterVersion = officialRosterVersion;
+    state.access.staffPassword = defaultAccess.staffPassword;
+    state.access.staffAccounts = officialStaffAccounts.map((account) => ({ ...account }));
+    if (!state.access.adminPassword || state.access.adminPassword === 'admin123') {
+      state.access.adminPassword = defaultAccess.adminPassword;
+    }
+    saveAccess();
+  }
   if (!Array.isArray(state.access.staffAccounts) || !state.access.staffAccounts.length) {
     const storedStaff = localStorage.getItem(staffStorageKey);
     const names = storedStaff ? JSON.parse(storedStaff) : defaultStaff;
@@ -1002,6 +1025,7 @@ function saveAdminSettings(event) {
   }
   state.staff = uniqueAccounts.map((account) => account.name);
   state.access = {
+    rosterVersion: officialRosterVersion,
     staffPassword: defaultStaffPassword,
     adminPassword: els.adminPasswordInput.value.trim() || defaultAccess.adminPassword,
     viewerPassword: els.viewerPasswordInput.value.trim() || defaultAccess.viewerPassword,
@@ -1137,7 +1161,9 @@ function bindEvents() {
   document.querySelector('#restoreStaffBtn').addEventListener('click', () => {
     if (!confirm('Restore the default staff list?')) return;
     state.staff = [...defaultStaff];
-    state.access.staffAccounts = defaultStaff.map((name) => ({ name, password: state.access.staffPassword || defaultAccess.staffPassword }));
+    state.access.rosterVersion = officialRosterVersion;
+    state.access.staffPassword = defaultAccess.staffPassword;
+    state.access.staffAccounts = officialStaffAccounts.map((account) => ({ ...account }));
     els.staffNamesInput.value = staffAccountLines();
     saveStaff();
     saveAccess();
