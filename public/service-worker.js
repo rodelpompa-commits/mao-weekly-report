@@ -1,4 +1,4 @@
-const cacheName = 'mao-weekly-report-root-v1';
+const cacheName = 'mao-weekly-report-root-v2';
 const appFiles = [
   '/',
   '/manifest.webmanifest',

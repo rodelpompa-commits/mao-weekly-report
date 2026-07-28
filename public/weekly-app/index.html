@@ -256,8 +256,22 @@
               <label for="reportDetails">Technical / Operational Report Details</label>
               <textarea id="reportDetails" rows="4" placeholder="Include analytical details from the reporting guide when applicable: inputs used, practices observed, crop condition, pests, yield, constraints, assistance needed, recommendations, and follow-up."></textarea>
             </div>
+            <div class="field">
+              <label for="cropStage">Crop Stage</label>
+              <select id="cropStage">
+                <option value="Not crop-specific">Not crop-specific</option>
+                <option>Land preparation</option>
+                <option>Seedbed</option>
+                <option>Newly planted</option>
+                <option>Vegetative</option>
+                <option>Reproductive</option>
+                <option>Maturity</option>
+                <option>Harvesting</option>
+                <option>Marketing</option>
+              </select>
+            </div>
             <div class="report-checklist auto-checklist full">
-              <div class="auto-checklist-heading">System-detected reporting checklist</div>
+              <div class="auto-checklist-heading">System-detected reporting checklist for selected stage</div>
               <div id="autoChecklistPreview" class="auto-checklist-grid"></div>
             </div>
             <div class="field full">
@@ -274,8 +288,8 @@
             <summary>Staff Reporting Reference</summary>
             <div class="reference-grid">
               <p>Reports should be informative and analytical, with current dates and a clear period covered.</p>
-              <p>For farm or field visits, include applicable technical details such as fertilizers or pesticides used, farming practices, variety planted, soil and land preparation, irrigation, pest and disease incidence, crop condition, yield estimate, constraints, best practices, post-harvest and marketing information.</p>
-              <p>The checklist grade applies only to technical assistance or field visit reports. The system detects the score from the written accomplishment and field evidence; staff cannot manually select checklist items.</p>
+              <p>For farm or field visits, include the details applicable to the current crop stage: land preparation, seedbed, newly planted, vegetative, reproductive, maturity, harvesting, or marketing.</p>
+              <p>The checklist grade applies only to technical assistance or field visit reports. The system grades only the checklist items appropriate to the selected stage and detects the score from the written accomplishment and field evidence.</p>
             </div>
           </details>
 

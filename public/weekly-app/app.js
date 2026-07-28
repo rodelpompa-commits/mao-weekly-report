@@ -35,28 +35,31 @@ const plusFactors = {
   'System Maintenance': 8,
   'System Creation': 10
 };
+const allCropStages = ['Land preparation', 'Seedbed', 'Newly planted', 'Vegetative', 'Reproductive', 'Maturity', 'Harvesting', 'Marketing'];
 const taReportRubric = [
   {
     label: 'Dates checked and current period covered',
+    stages: allCropStages,
     detect: (plan, text) => Boolean(plan.accomplishmentDate || plan.datePlanned || plan.weekStart || /\b(date|week|period|covered|conducted)\b/.test(text))
   },
-  { label: 'Fertilizers / pesticides used', keywords: ['fertilizer', 'fertiliser', 'urea', 'complete', '14-14-14', '16-20-0', 'pesticide', 'insecticide', 'herbicide', 'fungicide', 'chemical', 'spray'] },
-  { label: 'Farming practices / strategies', keywords: ['practice', 'strategy', 'method', 'planting', 'spacing', 'transplant', 'direct seeding', 'land preparation', 'cultural management', 'farm management'] },
-  { label: 'Crop variety / seed type and source', keywords: ['variety', 'seed', 'hybrid', 'inbred', 'certified seed', 'seed source', 'seedling', 'breed', 'stock'] },
-  { label: 'Soil condition / land preparation', keywords: ['soil', 'land preparation', 'plow', 'harrow', 'tillage', 'muddy', 'dry soil', 'soil condition', 'field condition'] },
-  { label: 'Irrigation / water management', keywords: ['irrigation', 'water', 'canal', 'pump', 'drainage', 'flooding', 'moisture', 'water management'] },
-  { label: 'Pest and disease incidence / control', keywords: ['pest', 'disease', 'insect', 'rat', 'bug', 'armyworm', 'stemborer', 'blast', 'bacterial', 'control', 'infestation', 'damage'] },
-  { label: 'Current crop condition / stage of growth', keywords: ['crop condition', 'condition', 'vegetative', 'flowering', 'tillering', 'booting', 'maturity', 'growth stage', 'healthy', 'stunted'] },
-  { label: 'Estimated yield / comparison', keywords: ['yield', 'estimated production', 'production', 'harvest estimate', 'bags', 'tons', 'cavans', 'comparison', 'compared'] },
-  { label: 'Challenges / constraints encountered', keywords: ['challenge', 'constraint', 'problem', 'issue', 'concern', 'lack', 'shortage', 'delayed', 'damage', 'difficulty'] },
-  { label: 'Innovative or best practices observed', keywords: ['innovation', 'innovative', 'best practice', 'good practice', 'improved', 'technology', 'demo', 'adapted'] },
-  { label: 'Harvesting / post-harvest practices', keywords: ['harvest', 'post-harvest', 'post harvest', 'drying', 'milling', 'storage', 'threshing', 'processing'] },
-  { label: 'Marketing information', keywords: ['market', 'price', 'buyer', 'trader', 'selling', 'marketing', 'demand', 'farmgate'] },
+  { label: 'Fertilizers / pesticides used', stages: ['Vegetative', 'Reproductive'], keywords: ['fertilizer', 'fertiliser', 'urea', 'complete', '14-14-14', '16-20-0', 'pesticide', 'insecticide', 'herbicide', 'fungicide', 'chemical', 'spray'] },
+  { label: 'Farming practices / strategies', stages: ['Land preparation', 'Seedbed', 'Newly planted', 'Vegetative'], keywords: ['practice', 'strategy', 'method', 'planting', 'spacing', 'transplant', 'direct seeding', 'land preparation', 'cultural management', 'farm management'] },
+  { label: 'Crop variety / seed type and source', stages: ['Seedbed', 'Newly planted'], keywords: ['variety', 'seed', 'hybrid', 'inbred', 'certified seed', 'seed source', 'seedling', 'breed', 'stock'] },
+  { label: 'Soil condition / land preparation', stages: ['Land preparation', 'Newly planted'], keywords: ['soil', 'land preparation', 'plow', 'harrow', 'tillage', 'muddy', 'dry soil', 'soil condition', 'field condition'] },
+  { label: 'Irrigation / water management', stages: ['Land preparation', 'Seedbed', 'Newly planted', 'Vegetative', 'Reproductive'], keywords: ['irrigation', 'water', 'canal', 'pump', 'drainage', 'flooding', 'moisture', 'water management'] },
+  { label: 'Pest and disease incidence / control', stages: ['Seedbed', 'Newly planted', 'Vegetative', 'Reproductive', 'Maturity'], keywords: ['pest', 'disease', 'insect', 'rat', 'bug', 'armyworm', 'stemborer', 'blast', 'bacterial', 'control', 'infestation', 'damage'] },
+  { label: 'Current crop condition / stage of growth', stages: ['Seedbed', 'Newly planted', 'Vegetative', 'Reproductive', 'Maturity'], keywords: ['crop condition', 'condition', 'vegetative', 'flowering', 'tillering', 'booting', 'maturity', 'growth stage', 'healthy', 'stunted'] },
+  { label: 'Estimated yield / comparison', stages: ['Reproductive', 'Maturity', 'Harvesting'], keywords: ['yield', 'estimated production', 'production', 'harvest estimate', 'bags', 'tons', 'cavans', 'comparison', 'compared'] },
+  { label: 'Challenges / constraints encountered', stages: allCropStages, keywords: ['challenge', 'constraint', 'problem', 'issue', 'concern', 'lack', 'shortage', 'delayed', 'damage', 'difficulty'] },
+  { label: 'Innovative or best practices observed', stages: ['Vegetative', 'Reproductive', 'Maturity'], keywords: ['innovation', 'innovative', 'best practice', 'good practice', 'improved', 'technology', 'demo', 'adapted'] },
+  { label: 'Harvesting / post-harvest practices', stages: ['Maturity', 'Harvesting'], keywords: ['harvest', 'post-harvest', 'post harvest', 'drying', 'milling', 'storage', 'threshing', 'processing'] },
+  { label: 'Marketing information', stages: ['Marketing'], keywords: ['market', 'price', 'buyer', 'trader', 'selling', 'marketing', 'demand', 'farmgate'] },
   {
     label: 'Technical assistance evidence',
+    stages: allCropStages,
     detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(technical assistance|assisted|advised|consultation|field visit|validated|inspection|training)\b/.test(text))
   },
-  { label: 'Recommendations / interventions / follow-up', keywords: ['recommend', 'recommendation', 'intervention', 'follow-up', 'follow up', 'advised', 'next step', 'action needed', 'solution'] }
+  { label: 'Recommendations / interventions / follow-up', stages: allCropStages, keywords: ['recommend', 'recommendation', 'intervention', 'follow-up', 'follow up', 'advised', 'next step', 'action needed', 'solution'] }
 ];
 const storageKey = 'weekly-itinerary-accomplishment-monitor-v1';
 const staffStorageKey = 'weekly-accomplishment-staff-v1';
@@ -147,6 +150,7 @@ const els = {
   captureLocationBtn: document.querySelector('#captureLocationBtn'),
   locationStatus: document.querySelector('#locationStatus'),
   taPhotoPreview: document.querySelector('#taPhotoPreview'),
+  cropStage: document.querySelector('#cropStage'),
   reportDetails: document.querySelector('#reportDetails'),
   autoChecklistPreview: document.querySelector('#autoChecklistPreview'),
   reportGradePreview: document.querySelector('#reportGradePreview'),
@@ -268,10 +272,20 @@ function normalizedReportText(plan) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
+function cropStageFor(plan) {
+  return allCropStages.includes(plan.cropStage) ? plan.cropStage : 'Not crop-specific';
+}
+
+function applicableReportItems(plan) {
+  const stage = cropStageFor(plan);
+  if (stage === 'Not crop-specific') return taReportRubric;
+  return taReportRubric.filter((item) => item.stages.includes(stage));
+}
+
 function detectedReportItems(plan) {
   if (!plan.technicalAssistance) return [];
   const text = normalizedReportText(plan);
-  return taReportRubric
+  return applicableReportItems(plan)
     .filter((item) => {
       if (item.detect) return item.detect(plan, text);
       return item.keywords.some((keyword) => text.includes(keyword));
@@ -282,7 +296,8 @@ function detectedReportItems(plan) {
 function reportGrade(plan) {
   if (!plan.technicalAssistance) return null;
   const checkedItems = detectedReportItems(plan).length;
-  return Math.round((checkedItems / taReportRubric.length) * 100);
+  const applicableItems = applicableReportItems(plan).length || taReportRubric.length;
+  return Math.round((checkedItems / applicableItems) * 100);
 }
 
 function reportGradeClass(grade) {
@@ -626,8 +641,9 @@ function renderAccomplishmentRows() {
       : '';
     const reportReference = [
       escapeHtml(plan.reportDetails || ''),
+      plan.technicalAssistance ? `<div class="staff-meta">Crop stage: ${escapeHtml(cropStageFor(plan))}</div>` : '',
       plan.technicalAssistance && detectedReportItems(plan).length
-        ? `<div class="staff-meta">System detected: ${escapeHtml(detectedReportItems(plan).join(', '))}</div>`
+        ? `<div class="staff-meta">System detected ${detectedReportItems(plan).length}/${applicableReportItems(plan).length}: ${escapeHtml(detectedReportItems(plan).join(', '))}</div>`
         : `<div class="staff-meta">${plan.technicalAssistance ? 'No checklist evidence detected yet' : 'Not graded under technical-assistance checklist'}</div>`
     ].join('');
     const grade = reportGrade(plan);
@@ -810,6 +826,7 @@ function updateReportGradePreview() {
     task: els.accomplishmentOutput.value,
     accomplishmentOutput: els.accomplishmentOutput.value,
     justification: els.accomplishmentJustification.value,
+    cropStage: els.cropStage.value,
     reportDetails: els.reportDetails.value,
     technicalAssistance: els.accomplishmentTechnicalAssistance.checked,
     taLatitude: els.locationStatus.dataset.lat || '',
@@ -817,10 +834,11 @@ function updateReportGradePreview() {
     taPhotoData: els.taPhotoPreview.dataset.photoData || ''
   };
   const detected = detectedReportItems(tempPlan);
+  const applicable = applicableReportItems(tempPlan);
   els.reportGradePreview.textContent = reportGradeText(tempPlan);
   els.reportGradePreview.className = `grade-preview ${reportGradeClass(reportGrade(tempPlan))}`;
   if (els.autoChecklistPreview) {
-    els.autoChecklistPreview.innerHTML = taReportRubric.map((item) => {
+    els.autoChecklistPreview.innerHTML = applicable.map((item) => {
       const matched = detected.includes(item.label);
       return `<span class="${matched ? 'detected' : 'missing'}">${matched ? 'Detected' : 'Missing'}: ${escapeHtml(item.label)}</span>`;
     }).join('');
@@ -1067,6 +1085,7 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentOutput.value = target.accomplishmentOutput || target.task || '';
   els.accomplishmentJustification.value = target.justification || '';
   els.accomplishmentTechnicalAssistance.checked = Boolean(target.technicalAssistance);
+  els.cropStage.value = target.cropStage || 'Not crop-specific';
   els.reportDetails.value = target.reportDetails || '';
   setLocationStatus(target.taLatitude || '', target.taLongitude || '', target.taLocationCapturedAt || '');
   setPhotoPreview(target.taPhotoData || '');
@@ -1113,6 +1132,7 @@ function saveAccomplishment(event) {
   plan.accomplishmentOutput = els.accomplishmentOutput.value.trim();
   plan.justification = justification;
   plan.technicalAssistance = els.accomplishmentTechnicalAssistance.checked;
+  plan.cropStage = plan.technicalAssistance ? els.cropStage.value : '';
   plan.reportDetails = els.reportDetails.value.trim();
   plan.taLatitude = plan.technicalAssistance ? els.locationStatus.dataset.lat || '' : '';
   plan.taLongitude = plan.technicalAssistance ? els.locationStatus.dataset.lng || '' : '';
@@ -1145,6 +1165,7 @@ function removeAccomplishment(plan) {
     delete plan.justification;
     delete plan.reportDetails;
     delete plan.reportItems;
+    delete plan.cropStage;
     delete plan.taLatitude;
     delete plan.taLongitude;
     delete plan.taLocationCapturedAt;
@@ -1224,7 +1245,7 @@ function exportCsv() {
     ['Week Start', els.weekStart.value],
     ['Week End', els.weekEnd.value],
     [],
-    ['Staff', 'Planned Date', 'Program', 'Work Type', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Plus Factor', 'Adjusted Score', 'Latitude', 'Longitude', 'Justification / Boss Instruction', 'Technical / Operational Details', 'Report Checklist', 'TA Report Grade', 'Rating Effect'],
+    ['Staff', 'Planned Date', 'Program', 'Work Type', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'Crop Stage', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Plus Factor', 'Adjusted Score', 'Latitude', 'Longitude', 'Justification / Boss Instruction', 'Technical / Operational Details', 'Applicable Checklist Count', 'System Detected Checklist', 'TA Report Grade', 'Rating Effect'],
     ...filteredPlans().map((plan) => [
       plan.staffName,
       plan.datePlanned,
@@ -1234,6 +1255,7 @@ function exportCsv() {
       plan.place,
       plan.clients,
       plan.technicalAssistance ? 'Yes' : 'No',
+      plan.technicalAssistance ? cropStageFor(plan) : '',
       plan.accomplishmentType || '',
       plan.accomplishmentDate || '',
       plan.accomplishmentOutput || '',
@@ -1244,6 +1266,7 @@ function exportCsv() {
       plan.taLongitude || '',
       plan.justification || '',
       plan.reportDetails || '',
+      plan.technicalAssistance ? applicableReportItems(plan).length : '',
       detectedReportItems(plan).join('; '),
       reportGradeText(plan),
       ratingEffect(plan)
@@ -1392,6 +1415,7 @@ function bindEvents() {
   els.accomplishmentStaff.addEventListener('change', updateReportGradePreview);
   els.accomplishmentDate.addEventListener('change', updateReportGradePreview);
   els.accomplishmentTechnicalAssistance.addEventListener('change', updateReportGradePreview);
+  els.cropStage.addEventListener('change', updateReportGradePreview);
   els.accomplishmentType.addEventListener('change', updateAdjustedScorePreview);
   els.accomplishmentPercent.addEventListener('input', updateAdjustedScorePreview);
   els.accomplishmentWorkType.addEventListener('change', updateAdjustedScorePreview);
