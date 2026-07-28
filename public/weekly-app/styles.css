@@ -377,6 +377,12 @@ button {
   color: var(--bad);
 }
 
+.grade.not-applicable,
+.grade-preview.not-applicable {
+  background: #edf2f7;
+  color: var(--muted);
+}
+
 .reference-panel {
   background: #fbfcfe;
   border: 1px solid var(--line);
@@ -723,6 +729,11 @@ tbody tr:hover {
   .view {
     display: block;
     margin-bottom: 24px;
+  }
+
+  body.role-staff #dashboardView,
+  body.role-viewer #dashboardView {
+    display: none;
   }
 
   .workspace {

@@ -97,7 +97,7 @@
           <strong id="overallEfficiency">0%</strong>
         </article>
         <article class="metric">
-          <span>Report Grade</span>
+          <span>TA Report Grade</span>
           <strong id="overallReportGrade">0%</strong>
         </article>
       </section>
@@ -141,6 +141,10 @@
               <label for="planClients">Clients to be Contacted</label>
               <textarea id="planClients" rows="2"></textarea>
             </div>
+            <label class="setting-check full">
+              <input id="planTechnicalAssistance" type="checkbox" />
+              Technical assistance / field visit report
+            </label>
             <div class="form-actions">
               <button type="button" id="cancelPlanBtn" class="subtle-btn">Cancel</button>
               <button type="submit" class="primary-btn">Save Itinerary</button>
@@ -157,6 +161,7 @@
                   <th>Task</th>
                   <th>Place</th>
                   <th>Clients</th>
+                  <th>Report Grade Applies</th>
                   <th>Accomplishment Status</th>
                   <th class="actions-col">Actions</th>
                 </tr>
@@ -204,6 +209,10 @@
               <label for="accomplishmentJustification">Justification / Boss Instruction Details</label>
               <textarea id="accomplishmentJustification" rows="2"></textarea>
             </div>
+            <label class="setting-check full">
+              <input id="accomplishmentTechnicalAssistance" type="checkbox" />
+              Grade this report using the technical-assistance recommendation checklist
+            </label>
             <div class="field full">
               <label for="reportDetails">Technical / Operational Report Details</label>
               <textarea id="reportDetails" rows="4" placeholder="Include analytical details from the reporting guide when applicable: inputs used, practices observed, crop condition, pests, yield, constraints, assistance needed, recommendations, and follow-up."></textarea>
@@ -227,8 +236,8 @@
               <label><input type="checkbox" name="reportItem" value="Recommendations / interventions / follow-up" /> Recommendations / interventions / follow-up</label>
             </fieldset>
             <div class="field full">
-              <label>Automatic Report Grade</label>
-              <div id="reportGradePreview" class="grade-preview">0%</div>
+              <label>Automatic TA Report Grade</label>
+              <div id="reportGradePreview" class="grade-preview">N/A</div>
             </div>
             <div class="form-actions">
               <button type="button" id="cancelAccomplishmentBtn" class="subtle-btn">Cancel</button>
@@ -241,7 +250,7 @@
             <div class="reference-grid">
               <p>Reports should be informative and analytical, with current dates and a clear period covered.</p>
               <p>For farm or field visits, include applicable technical details such as fertilizers or pesticides used, farming practices, variety planted, soil and land preparation, irrigation, pest and disease incidence, crop condition, yield estimate, constraints, best practices, post-harvest and marketing information.</p>
-              <p>Close the report with technical assistance needed, recommendations or interventions provided, and follow-up actions.</p>
+              <p>The checklist grade applies only to technical assistance or field visit reports. Other work is not graded under this recommendation checklist.</p>
             </div>
           </details>
 
@@ -256,7 +265,7 @@
                   <th>Program</th>
                   <th>Accomplishment</th>
                   <th>Report Reference</th>
-                  <th>Report Grade</th>
+                  <th>TA Report Grade</th>
                   <th>Rating Effect</th>
                   <th class="actions-col">Actions</th>
                 </tr>
@@ -298,9 +307,9 @@
                 <p>Performance score for newly instructed tasks.</p>
               </article>
               <article class="insight">
-                <span>Average Report Grade</span>
+                <span>Average TA Report Grade</span>
                 <strong id="averageReportGrade">0%</strong>
-                <p>Based on the reporting-reference checklist.</p>
+                <p>Only technical-assistance reports are included.</p>
               </article>
             </div>
 
@@ -315,7 +324,7 @@
                     <th>Boss Changes</th>
                     <th>Efficiency</th>
                     <th>Boss Task Rating</th>
-                    <th>Report Grade</th>
+                    <th>TA Report Grade</th>
                   </tr>
                 </thead>
                 <tbody id="dashboardRows"></tbody>

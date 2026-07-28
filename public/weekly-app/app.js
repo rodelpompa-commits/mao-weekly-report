@@ -85,6 +85,7 @@ const els = {
   planPlace: document.querySelector('#planPlace'),
   planTask: document.querySelector('#planTask'),
   planClients: document.querySelector('#planClients'),
+  planTechnicalAssistance: document.querySelector('#planTechnicalAssistance'),
   accomplishmentForm: document.querySelector('#accomplishmentForm'),
   accomplishmentPlanId: document.querySelector('#accomplishmentPlanId'),
   accomplishmentStaff: document.querySelector('#accomplishmentStaff'),
@@ -93,6 +94,7 @@ const els = {
   accomplishmentPercent: document.querySelector('#accomplishmentPercent'),
   accomplishmentOutput: document.querySelector('#accomplishmentOutput'),
   accomplishmentJustification: document.querySelector('#accomplishmentJustification'),
+  accomplishmentTechnicalAssistance: document.querySelector('#accomplishmentTechnicalAssistance'),
   reportDetails: document.querySelector('#reportDetails'),
   reportGradePreview: document.querySelector('#reportGradePreview'),
   adminModal: document.querySelector('#adminModal'),
@@ -147,6 +149,7 @@ function selectedReportItems() {
 }
 
 function reportGrade(plan) {
+  if (!plan.technicalAssistance) return null;
   const totalItems = reportItemInputs().length || 15;
   const checkedItems = Array.isArray(plan.reportItems) ? plan.reportItems.length : 0;
   const detailsBonus = plan.reportDetails && plan.reportDetails.trim().length >= 60 ? 5 : 0;
@@ -154,6 +157,7 @@ function reportGrade(plan) {
 }
 
 function reportGradeClass(grade) {
+  if (grade === null || grade === undefined) return 'not-applicable';
   if (grade >= 90) return 'excellent';
   if (grade >= 75) return 'good';
   if (grade >= 60) return 'fair';
@@ -162,6 +166,7 @@ function reportGradeClass(grade) {
 
 function reportGradeText(plan) {
   const grade = reportGrade(plan);
+  if (grade === null || grade === undefined) return 'N/A';
   return `${grade}%`;
 }
 
@@ -226,6 +231,7 @@ function samplePlans() {
     place: item[3],
     task: item[4],
     clients: item[5],
+    technicalAssistance: index < 3,
     accomplishmentType: item[6],
     accomplishmentDate: addDays(weekStart, item[1]),
     accomplishmentPercent: item[7],
@@ -362,10 +368,10 @@ function ratingStats(plans) {
   const bossRating = bossChanges.length
     ? Math.round(bossChanges.reduce((sum, plan) => sum + Number(plan.accomplishmentPercent || 0), 0) / bossChanges.length)
     : 0;
-  const accomplishedReports = plans.filter((plan) => plan.accomplishmentType);
+  const accomplishedReports = plans.filter((plan) => plan.accomplishmentType && plan.technicalAssistance);
   const averageReportGrade = accomplishedReports.length
     ? Math.round(accomplishedReports.reduce((sum, plan) => sum + reportGrade(plan), 0) / accomplishedReports.length)
-    : 0;
+    : null;
   return { ratedPlanned, conducted, justified, missing, bossChanges, efficiency, bossRating, averageReportGrade };
 }
 
@@ -392,11 +398,11 @@ function renderMetrics() {
   els.conductedTasks.textContent = stats.conducted.length;
   els.justificationNeeded.textContent = stats.justified.length + stats.missing.length;
   els.overallEfficiency.textContent = `${stats.efficiency}%`;
-  els.overallReportGrade.textContent = `${stats.averageReportGrade}%`;
+  els.overallReportGrade.textContent = stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`;
   els.notConductedCount.textContent = stats.justified.length + stats.missing.length;
   els.bossInstructionCount.textContent = stats.bossChanges.length;
   els.bossTaskRating.textContent = `${stats.bossRating}%`;
-  els.averageReportGrade.textContent = `${stats.averageReportGrade}%`;
+  els.averageReportGrade.textContent = stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`;
 }
 
 function renderPlanRows() {
@@ -425,6 +431,7 @@ function renderPlanRows() {
       <td>${escapeHtml(plan.task)}</td>
       <td>${escapeHtml(plan.place)}</td>
       <td>${escapeHtml(plan.clients || '')}</td>
+      <td>${plan.technicalAssistance ? 'Yes' : 'No'}</td>
       <td>${statusLabel(plan)}</td>
       <td>
         <div class="row-actions">
@@ -450,12 +457,12 @@ function renderAccomplishmentRows() {
       : '<span class="staff-meta">Waiting for accomplishment entry</span>';
     const reportReference = [
       escapeHtml(plan.reportDetails || ''),
-      plan.reportItems && plan.reportItems.length
+      plan.technicalAssistance && plan.reportItems && plan.reportItems.length
         ? `<div class="staff-meta">Checklist: ${escapeHtml(plan.reportItems.join(', '))}</div>`
-        : '<div class="staff-meta">No checklist items selected</div>'
+        : `<div class="staff-meta">${plan.technicalAssistance ? 'No checklist items selected' : 'Not graded under technical-assistance checklist'}</div>`
     ].join('');
     const grade = reportGrade(plan);
-    const gradeHtml = `<span class="grade ${reportGradeClass(grade)}">${grade}%</span>`;
+    const gradeHtml = `<span class="grade ${reportGradeClass(grade)}">${reportGradeText(plan)}</span>`;
     const canEncode = isAdmin() || (isStaff() && state.access.staffCanAccomplish);
     row.innerHTML = `
       <td>${escapeHtml(plan.staffName)}</td>
@@ -492,7 +499,7 @@ function renderDashboard() {
       <td>${stats.bossChanges.length}</td>
       <td>${stats.efficiency}%</td>
       <td>${stats.bossRating}%</td>
-      <td>${stats.averageReportGrade}%</td>
+      <td>${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}</td>
     `;
     els.dashboardRows.append(row);
 
@@ -504,7 +511,7 @@ function renderDashboard() {
         <span class="staff-meta">${stats.conducted.length}/${stats.ratedPlanned.length} conducted</span>
       </div>
       <div class="bar" aria-label="${escapeHtml(name)} efficiency ${stats.efficiency}%"><span style="width: ${stats.efficiency}%"></span></div>
-      <div class="staff-meta">${stats.bossChanges.length} boss-instructed change(s), boss task rating ${stats.bossRating}%, report grade ${stats.averageReportGrade}%</div>
+      <div class="staff-meta">${stats.bossChanges.length} boss-instructed change(s), boss task rating ${stats.bossRating}%, report grade ${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}</div>
     `;
     els.staffList.append(item);
   });
@@ -513,7 +520,8 @@ function renderDashboard() {
 function updateReportGradePreview() {
   const tempPlan = {
     reportDetails: els.reportDetails.value,
-    reportItems: selectedReportItems()
+    reportItems: selectedReportItems(),
+    technicalAssistance: els.accomplishmentTechnicalAssistance.checked
   };
   els.reportGradePreview.textContent = reportGradeText(tempPlan);
   els.reportGradePreview.className = `grade-preview ${reportGradeClass(reportGrade(tempPlan))}`;
@@ -525,13 +533,16 @@ function applyAccessRules() {
   document.body.classList.toggle('is-locked', !loggedIn);
   els.sessionBadge.textContent = isAdmin() ? 'Admin' : isViewer() ? 'Viewer' : `Staff: ${state.session.staffName || ''}`;
   document.querySelector('#adminBtn').classList.toggle('hidden', !isAdmin());
-  document.querySelector('#printBtn').classList.toggle('hidden', !isAdmin());
-  document.querySelector('#exportBtn').classList.toggle('hidden', !isAdmin());
+  document.querySelector('#printBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
+  document.querySelector('#exportBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
   document.querySelector('[data-view="dashboardView"]').classList.toggle('hidden', !(isAdmin() || isViewer()));
   document.querySelector('#resetBtn').classList.toggle('hidden', !isAdmin());
   document.querySelector('#addPlanBtn').classList.toggle('hidden', !(isAdmin() || (isStaff() && state.access.staffCanPlan)));
   document.querySelector('#addBossTaskBtn').classList.toggle('hidden', !(isAdmin() || (isStaff() && state.access.staffCanBossTask)));
   els.staffFilter.disabled = isStaff();
+  document.body.classList.toggle('role-staff', isStaff());
+  document.body.classList.toggle('role-admin', isAdmin());
+  document.body.classList.toggle('role-viewer', isViewer());
   if (isStaff()) {
     state.staffFilter = state.session.staffName;
     els.staffFilter.value = state.session.staffName;
@@ -568,6 +579,7 @@ function showPlanForm(plan = null) {
     els.planPlace.value = plan.place;
     els.planTask.value = plan.task;
     els.planClients.value = plan.clients || '';
+    els.planTechnicalAssistance.checked = Boolean(plan.technicalAssistance);
   } else {
     els.planForm.reset();
     els.planId.value = '';
@@ -599,7 +611,8 @@ function savePlan(event) {
     program: els.planProgram.value,
     place: els.planPlace.value.trim(),
     task: els.planTask.value.trim(),
-    clients: els.planClients.value.trim()
+    clients: els.planClients.value.trim(),
+    technicalAssistance: els.planTechnicalAssistance.checked
   };
   const index = state.plans.findIndex((item) => item.id === plan.id);
   if (index >= 0) state.plans[index] = plan;
@@ -637,6 +650,7 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentPercent.value = target.accomplishmentPercent ?? 100;
   els.accomplishmentOutput.value = target.accomplishmentOutput || target.task || '';
   els.accomplishmentJustification.value = target.justification || '';
+  els.accomplishmentTechnicalAssistance.checked = Boolean(target.technicalAssistance);
   els.reportDetails.value = target.reportDetails || '';
   reportItemInputs().forEach((input) => {
     input.checked = Array.isArray(target.reportItems) && target.reportItems.includes(input.value);
@@ -677,8 +691,9 @@ function saveAccomplishment(event) {
   plan.accomplishmentPercent = Number(els.accomplishmentPercent.value);
   plan.accomplishmentOutput = els.accomplishmentOutput.value.trim();
   plan.justification = justification;
+  plan.technicalAssistance = els.accomplishmentTechnicalAssistance.checked;
   plan.reportDetails = els.reportDetails.value.trim();
-  plan.reportItems = reportItemInputs().filter((input) => input.checked).map((input) => input.value);
+  plan.reportItems = plan.technicalAssistance ? selectedReportItems() : [];
   if (type === 'Boss Instruction' && plan.task === 'New task instructed by the Boss') {
     plan.task = plan.accomplishmentOutput;
     plan.program = plan.program || programs[0];
@@ -767,7 +782,7 @@ function exportCsv() {
     ['Week Start', els.weekStart.value],
     ['Week End', els.weekEnd.value],
     [],
-    ['Staff', 'Planned Date', 'Program', 'Planned Task', 'Place', 'Clients', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Justification / Boss Instruction', 'Technical / Operational Details', 'Report Checklist', 'Report Grade', 'Rating Effect'],
+    ['Staff', 'Planned Date', 'Program', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Justification / Boss Instruction', 'Technical / Operational Details', 'Report Checklist', 'TA Report Grade', 'Rating Effect'],
     ...filteredPlans().map((plan) => [
       plan.staffName,
       plan.datePlanned,
@@ -775,6 +790,7 @@ function exportCsv() {
       plan.task,
       plan.place,
       plan.clients,
+      plan.technicalAssistance ? 'Yes' : 'No',
       plan.accomplishmentType || '',
       plan.accomplishmentDate || '',
       plan.accomplishmentOutput || '',
@@ -880,6 +896,7 @@ function bindEvents() {
   document.querySelector('#logoutBtn').addEventListener('click', handleLogout);
   reportItemInputs().forEach((input) => input.addEventListener('change', updateReportGradePreview));
   els.reportDetails.addEventListener('input', updateReportGradePreview);
+  els.accomplishmentTechnicalAssistance.addEventListener('change', updateReportGradePreview);
   document.querySelector('#resetBtn').addEventListener('click', () => {
     if (!confirm('Restore sample itinerary and accomplishment records?')) return;
     state.plans = samplePlans();
