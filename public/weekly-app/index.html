@@ -256,24 +256,10 @@
               <label for="reportDetails">Technical / Operational Report Details</label>
               <textarea id="reportDetails" rows="4" placeholder="Include analytical details from the reporting guide when applicable: inputs used, practices observed, crop condition, pests, yield, constraints, assistance needed, recommendations, and follow-up."></textarea>
             </div>
-            <fieldset class="report-checklist full">
-              <legend>Reporting Reference Checklist</legend>
-              <label><input type="checkbox" name="reportItem" value="Dates checked and current period covered" /> Dates checked and current period covered</label>
-              <label><input type="checkbox" name="reportItem" value="Fertilizers / pesticides used" /> Fertilizers / pesticides used</label>
-              <label><input type="checkbox" name="reportItem" value="Farming practices / strategies" /> Farming practices / strategies</label>
-              <label><input type="checkbox" name="reportItem" value="Crop variety / seed type and source" /> Crop variety / seed type and source</label>
-              <label><input type="checkbox" name="reportItem" value="Soil condition / land preparation" /> Soil condition / land preparation</label>
-              <label><input type="checkbox" name="reportItem" value="Irrigation / water management" /> Irrigation / water management</label>
-              <label><input type="checkbox" name="reportItem" value="Pest and disease incidence / control" /> Pest and disease incidence / control</label>
-              <label><input type="checkbox" name="reportItem" value="Current crop condition / stage of growth" /> Current crop condition / stage of growth</label>
-              <label><input type="checkbox" name="reportItem" value="Estimated yield / comparison" /> Estimated yield / comparison</label>
-              <label><input type="checkbox" name="reportItem" value="Challenges / constraints encountered" /> Challenges / constraints encountered</label>
-              <label><input type="checkbox" name="reportItem" value="Innovative or best practices observed" /> Innovative or best practices observed</label>
-              <label><input type="checkbox" name="reportItem" value="Harvesting / post-harvest practices" /> Harvesting / post-harvest practices</label>
-              <label><input type="checkbox" name="reportItem" value="Marketing information" /> Marketing information</label>
-              <label><input type="checkbox" name="reportItem" value="Technical assistance required" /> Technical assistance required</label>
-              <label><input type="checkbox" name="reportItem" value="Recommendations / interventions / follow-up" /> Recommendations / interventions / follow-up</label>
-            </fieldset>
+            <div class="report-checklist auto-checklist full">
+              <div class="auto-checklist-heading">System-detected reporting checklist</div>
+              <div id="autoChecklistPreview" class="auto-checklist-grid"></div>
+            </div>
             <div class="field full">
               <label>Automatic TA Report Grade</label>
               <div id="reportGradePreview" class="grade-preview">N/A</div>
@@ -289,7 +275,7 @@
             <div class="reference-grid">
               <p>Reports should be informative and analytical, with current dates and a clear period covered.</p>
               <p>For farm or field visits, include applicable technical details such as fertilizers or pesticides used, farming practices, variety planted, soil and land preparation, irrigation, pest and disease incidence, crop condition, yield estimate, constraints, best practices, post-harvest and marketing information.</p>
-              <p>The checklist grade applies only to technical assistance or field visit reports. Other work is not graded under this recommendation checklist.</p>
+              <p>The checklist grade applies only to technical assistance or field visit reports. The system detects the score from the written accomplishment and field evidence; staff cannot manually select checklist items.</p>
             </div>
           </details>
 

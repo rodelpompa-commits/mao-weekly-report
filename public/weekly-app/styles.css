@@ -317,32 +317,40 @@ button {
   border-radius: 8px;
   display: grid;
   gap: 9px 14px;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
   margin: 0;
   padding: 14px;
 }
 
-.report-checklist legend {
+.auto-checklist-heading {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
-  padding: 0 6px;
 }
 
-.report-checklist label {
-  align-items: flex-start;
-  color: var(--ink);
-  display: flex;
-  font-size: 13px;
-  font-weight: 400;
+.auto-checklist-grid {
+  display: grid;
   gap: 8px;
-  line-height: 1.35;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
 }
 
-.report-checklist input {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  width: auto;
+.auto-checklist-grid span {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  min-height: 30px;
+  padding: 7px 10px;
+}
+
+.auto-checklist-grid .detected {
+  background: var(--soft-green);
+  color: var(--ok);
+}
+
+.auto-checklist-grid .missing {
+  background: #edf2f7;
+  color: var(--muted);
 }
 
 .grade,
@@ -819,6 +827,7 @@ tbody tr:hover {
   }
 
   .report-checklist,
+  .auto-checklist-grid,
   .reference-grid,
   .location-actions,
   .add-staff-grid,
@@ -853,6 +862,7 @@ tbody tr:hover {
   }
 
   .report-checklist,
+  .auto-checklist-grid,
   .reference-grid,
   .location-actions,
   .add-staff-grid,

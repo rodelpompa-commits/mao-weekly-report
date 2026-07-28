@@ -35,6 +35,29 @@ const plusFactors = {
   'System Maintenance': 8,
   'System Creation': 10
 };
+const taReportRubric = [
+  {
+    label: 'Dates checked and current period covered',
+    detect: (plan, text) => Boolean(plan.accomplishmentDate || plan.datePlanned || plan.weekStart || /\b(date|week|period|covered|conducted)\b/.test(text))
+  },
+  { label: 'Fertilizers / pesticides used', keywords: ['fertilizer', 'fertiliser', 'urea', 'complete', '14-14-14', '16-20-0', 'pesticide', 'insecticide', 'herbicide', 'fungicide', 'chemical', 'spray'] },
+  { label: 'Farming practices / strategies', keywords: ['practice', 'strategy', 'method', 'planting', 'spacing', 'transplant', 'direct seeding', 'land preparation', 'cultural management', 'farm management'] },
+  { label: 'Crop variety / seed type and source', keywords: ['variety', 'seed', 'hybrid', 'inbred', 'certified seed', 'seed source', 'seedling', 'breed', 'stock'] },
+  { label: 'Soil condition / land preparation', keywords: ['soil', 'land preparation', 'plow', 'harrow', 'tillage', 'muddy', 'dry soil', 'soil condition', 'field condition'] },
+  { label: 'Irrigation / water management', keywords: ['irrigation', 'water', 'canal', 'pump', 'drainage', 'flooding', 'moisture', 'water management'] },
+  { label: 'Pest and disease incidence / control', keywords: ['pest', 'disease', 'insect', 'rat', 'bug', 'armyworm', 'stemborer', 'blast', 'bacterial', 'control', 'infestation', 'damage'] },
+  { label: 'Current crop condition / stage of growth', keywords: ['crop condition', 'condition', 'vegetative', 'flowering', 'tillering', 'booting', 'maturity', 'growth stage', 'healthy', 'stunted'] },
+  { label: 'Estimated yield / comparison', keywords: ['yield', 'estimated production', 'production', 'harvest estimate', 'bags', 'tons', 'cavans', 'comparison', 'compared'] },
+  { label: 'Challenges / constraints encountered', keywords: ['challenge', 'constraint', 'problem', 'issue', 'concern', 'lack', 'shortage', 'delayed', 'damage', 'difficulty'] },
+  { label: 'Innovative or best practices observed', keywords: ['innovation', 'innovative', 'best practice', 'good practice', 'improved', 'technology', 'demo', 'adapted'] },
+  { label: 'Harvesting / post-harvest practices', keywords: ['harvest', 'post-harvest', 'post harvest', 'drying', 'milling', 'storage', 'threshing', 'processing'] },
+  { label: 'Marketing information', keywords: ['market', 'price', 'buyer', 'trader', 'selling', 'marketing', 'demand', 'farmgate'] },
+  {
+    label: 'Technical assistance evidence',
+    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(technical assistance|assisted|advised|consultation|field visit|validated|inspection|training)\b/.test(text))
+  },
+  { label: 'Recommendations / interventions / follow-up', keywords: ['recommend', 'recommendation', 'intervention', 'follow-up', 'follow up', 'advised', 'next step', 'action needed', 'solution'] }
+];
 const storageKey = 'weekly-itinerary-accomplishment-monitor-v1';
 const staffStorageKey = 'weekly-accomplishment-staff-v1';
 const signatoryStorageKey = 'weekly-accomplishment-signatories-v1';
@@ -125,6 +148,7 @@ const els = {
   locationStatus: document.querySelector('#locationStatus'),
   taPhotoPreview: document.querySelector('#taPhotoPreview'),
   reportDetails: document.querySelector('#reportDetails'),
+  autoChecklistPreview: document.querySelector('#autoChecklistPreview'),
   reportGradePreview: document.querySelector('#reportGradePreview'),
   totalPlusFactor: document.querySelector('#totalPlusFactor'),
   averageAdjustedScore: document.querySelector('#averageAdjustedScore'),
@@ -158,10 +182,6 @@ const els = {
 };
 
 let deferredInstallPrompt = null;
-
-function reportItemInputs() {
-  return Array.from(document.querySelectorAll('input[name="reportItem"]'));
-}
 
 function isAdmin() {
   return state.session.role === 'admin';
@@ -235,16 +255,34 @@ function passwordForStaff(name) {
   return account ? account.password : state.access.staffPassword;
 }
 
-function selectedReportItems() {
-  return reportItemInputs().filter((input) => input.checked).map((input) => input.value);
+function normalizedReportText(plan) {
+  return [
+    plan.staffName,
+    plan.program,
+    plan.place,
+    plan.task,
+    plan.clients,
+    plan.accomplishmentOutput,
+    plan.justification,
+    plan.reportDetails
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function detectedReportItems(plan) {
+  if (!plan.technicalAssistance) return [];
+  const text = normalizedReportText(plan);
+  return taReportRubric
+    .filter((item) => {
+      if (item.detect) return item.detect(plan, text);
+      return item.keywords.some((keyword) => text.includes(keyword));
+    })
+    .map((item) => item.label);
 }
 
 function reportGrade(plan) {
   if (!plan.technicalAssistance) return null;
-  const totalItems = reportItemInputs().length || 15;
-  const checkedItems = Array.isArray(plan.reportItems) ? plan.reportItems.length : 0;
-  const detailsBonus = plan.reportDetails && plan.reportDetails.trim().length >= 60 ? 5 : 0;
-  return Math.min(100, Math.round((checkedItems / totalItems) * 95 + detailsBonus));
+  const checkedItems = detectedReportItems(plan).length;
+  return Math.round((checkedItems / taReportRubric.length) * 100);
 }
 
 function reportGradeClass(grade) {
@@ -349,8 +387,7 @@ function samplePlans() {
     accomplishmentPercent: item[7],
     accomplishmentOutput: item[6] === 'Boss Instruction' ? 'Urgent office consolidation instructed by the Boss' : item[4],
     justification: item[8],
-    reportDetails: 'Report checked against the reporting reference guide. Technical observations and recommendations should be encoded here.',
-    reportItems: ['Dates checked and current period covered', 'Recommendations / interventions / follow-up']
+    reportDetails: 'Report checked against the reporting reference guide. Technical observations and recommendations should be encoded here.'
   }));
 }
 
@@ -589,9 +626,9 @@ function renderAccomplishmentRows() {
       : '';
     const reportReference = [
       escapeHtml(plan.reportDetails || ''),
-      plan.technicalAssistance && plan.reportItems && plan.reportItems.length
-        ? `<div class="staff-meta">Checklist: ${escapeHtml(plan.reportItems.join(', '))}</div>`
-        : `<div class="staff-meta">${plan.technicalAssistance ? 'No checklist items selected' : 'Not graded under technical-assistance checklist'}</div>`
+      plan.technicalAssistance && detectedReportItems(plan).length
+        ? `<div class="staff-meta">System detected: ${escapeHtml(detectedReportItems(plan).join(', '))}</div>`
+        : `<div class="staff-meta">${plan.technicalAssistance ? 'No checklist evidence detected yet' : 'Not graded under technical-assistance checklist'}</div>`
     ].join('');
     const grade = reportGrade(plan);
     const gradeHtml = `<span class="grade ${reportGradeClass(grade)}">${reportGradeText(plan)}</span>`;
@@ -760,12 +797,27 @@ function renderFieldMap() {
 
 function updateReportGradePreview() {
   const tempPlan = {
+    staffName: els.accomplishmentStaff.value,
+    datePlanned: els.accomplishmentDate.value,
+    accomplishmentDate: els.accomplishmentDate.value,
+    task: els.accomplishmentOutput.value,
+    accomplishmentOutput: els.accomplishmentOutput.value,
+    justification: els.accomplishmentJustification.value,
     reportDetails: els.reportDetails.value,
-    reportItems: selectedReportItems(),
-    technicalAssistance: els.accomplishmentTechnicalAssistance.checked
+    technicalAssistance: els.accomplishmentTechnicalAssistance.checked,
+    taLatitude: els.locationStatus.dataset.lat || '',
+    taLongitude: els.locationStatus.dataset.lng || '',
+    taPhotoData: els.taPhotoPreview.dataset.photoData || ''
   };
+  const detected = detectedReportItems(tempPlan);
   els.reportGradePreview.textContent = reportGradeText(tempPlan);
   els.reportGradePreview.className = `grade-preview ${reportGradeClass(reportGrade(tempPlan))}`;
+  if (els.autoChecklistPreview) {
+    els.autoChecklistPreview.innerHTML = taReportRubric.map((item) => {
+      const matched = detected.includes(item.label);
+      return `<span class="${matched ? 'detected' : 'missing'}">${matched ? 'Detected' : 'Missing'}: ${escapeHtml(item.label)}</span>`;
+    }).join('');
+  }
 }
 
 function updateAdjustedScorePreview() {
@@ -784,12 +836,14 @@ function setLocationStatus(lat, lng, capturedAt = new Date().toISOString()) {
   els.locationStatus.textContent = lat && lng
     ? `Location captured: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
     : 'No location captured yet.';
+  updateReportGradePreview();
 }
 
 function setPhotoPreview(dataUrl = '') {
   els.taPhotoPreview.dataset.photoData = dataUrl;
   els.taPhotoPreview.src = dataUrl;
   els.taPhotoPreview.classList.toggle('hidden', !dataUrl);
+  updateReportGradePreview();
 }
 
 function resizePhoto(file) {
@@ -1010,9 +1064,6 @@ function showAccomplishmentForm(plan = null) {
   setLocationStatus(target.taLatitude || '', target.taLongitude || '', target.taLocationCapturedAt || '');
   setPhotoPreview(target.taPhotoData || '');
   els.taPhotoInput.value = '';
-  reportItemInputs().forEach((input) => {
-    input.checked = Array.isArray(target.reportItems) && target.reportItems.includes(input.value);
-  });
   els.accomplishmentStaff.disabled = isStaff() && !isAdmin();
   updateReportGradePreview();
   updateAdjustedScorePreview();
@@ -1056,11 +1107,11 @@ function saveAccomplishment(event) {
   plan.justification = justification;
   plan.technicalAssistance = els.accomplishmentTechnicalAssistance.checked;
   plan.reportDetails = els.reportDetails.value.trim();
-  plan.reportItems = plan.technicalAssistance ? selectedReportItems() : [];
   plan.taLatitude = plan.technicalAssistance ? els.locationStatus.dataset.lat || '' : '';
   plan.taLongitude = plan.technicalAssistance ? els.locationStatus.dataset.lng || '' : '';
   plan.taLocationCapturedAt = plan.technicalAssistance ? els.locationStatus.dataset.capturedAt || '' : '';
   plan.taPhotoData = plan.technicalAssistance ? els.taPhotoPreview.dataset.photoData || '' : '';
+  plan.reportItems = detectedReportItems(plan);
   if (type === 'Boss Instruction' && plan.task === 'New task instructed by the Boss') {
     plan.task = plan.accomplishmentOutput;
     plan.program = plan.program || programs[0];
@@ -1163,7 +1214,7 @@ function exportCsv() {
       plan.taLongitude || '',
       plan.justification || '',
       plan.reportDetails || '',
-      (plan.reportItems || []).join('; '),
+      detectedReportItems(plan).join('; '),
       reportGradeText(plan),
       ratingEffect(plan)
     ])
@@ -1305,8 +1356,11 @@ function bindEvents() {
   els.installAppBtn.addEventListener('click', installApp);
   document.querySelector('#printBtn').addEventListener('click', () => window.print());
   document.querySelector('#logoutBtn').addEventListener('click', handleLogout);
-  reportItemInputs().forEach((input) => input.addEventListener('change', updateReportGradePreview));
   els.reportDetails.addEventListener('input', updateReportGradePreview);
+  els.accomplishmentOutput.addEventListener('input', updateReportGradePreview);
+  els.accomplishmentJustification.addEventListener('input', updateReportGradePreview);
+  els.accomplishmentStaff.addEventListener('change', updateReportGradePreview);
+  els.accomplishmentDate.addEventListener('change', updateReportGradePreview);
   els.accomplishmentTechnicalAssistance.addEventListener('change', updateReportGradePreview);
   els.accomplishmentType.addEventListener('change', updateAdjustedScorePreview);
   els.accomplishmentPercent.addEventListener('input', updateAdjustedScorePreview);
