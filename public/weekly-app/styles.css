@@ -716,13 +716,70 @@ tbody tr:hover {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
-  max-width: 620px;
+  max-height: calc(100vh - 36px);
+  max-width: 820px;
+  overflow: auto;
   padding: 18px;
-  width: min(100%, 620px);
+  width: min(100%, 820px);
 }
 
-.modal-panel textarea {
-  min-height: 260px;
+.raw-account-field {
+  display: none;
+}
+
+.account-manager {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  padding: 12px;
+}
+
+.account-manager h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.add-staff-grid {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1fr) 150px auto;
+}
+
+.account-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.account-row {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1fr) 150px auto;
+  padding: 10px;
+}
+
+.account-row strong,
+.account-row span {
+  display: block;
+}
+
+.account-row span {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.account-row input {
+  min-width: 0;
 }
 
 .settings-grid {
@@ -763,7 +820,9 @@ tbody tr:hover {
 
   .report-checklist,
   .reference-grid,
-  .location-actions {
+  .location-actions,
+  .add-staff-grid,
+  .account-row {
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -796,6 +855,8 @@ tbody tr:hover {
   .report-checklist,
   .reference-grid,
   .location-actions,
+  .add-staff-grid,
+  .account-row,
   .settings-grid {
     grid-template-columns: 1fr;
   }

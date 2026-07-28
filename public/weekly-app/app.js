@@ -132,6 +132,10 @@ const els = {
   fieldMap: document.querySelector('#fieldMap'),
   installAppBtn: document.querySelector('#installAppBtn'),
   adminModal: document.querySelector('#adminModal'),
+  newStaffNameInput: document.querySelector('#newStaffNameInput'),
+  newStaffPasswordInput: document.querySelector('#newStaffPasswordInput'),
+  addStaffAccountBtn: document.querySelector('#addStaffAccountBtn'),
+  staffAccountList: document.querySelector('#staffAccountList'),
   staffNamesInput: document.querySelector('#staffNamesInput'),
   staffPasswordInput: document.querySelector('#staffPasswordInput'),
   viewerPasswordInput: document.querySelector('#viewerPasswordInput'),
@@ -173,6 +177,57 @@ function isViewer() {
 
 function staffAccountLines() {
   return state.access.staffAccounts.map((account) => `${account.name} | ${account.password}`).join('\n');
+}
+
+function parseStaffAccountLines(value) {
+  return value
+    .split('\n')
+    .map((line) => {
+      const [namePart, passwordPart] = line.split('|');
+      return {
+        name: (namePart || '').trim(),
+        password: (passwordPart || '').trim()
+      };
+    })
+    .filter((account) => account.name);
+}
+
+function syncStaffAccountTextarea(accounts) {
+  els.staffNamesInput.value = accounts.map((account) => `${account.name} | ${account.password}`).join('\n');
+}
+
+function staffAccountsFromAdminForm() {
+  const defaultStaffPassword = els.staffPasswordInput.value.trim() || defaultAccess.staffPassword;
+  const previousAccounts = state.access.staffAccounts || [];
+  const accounts = parseStaffAccountLines(els.staffNamesInput.value).map((account) => {
+    const existing = previousAccounts.find((item) => item.name === account.name);
+    return {
+      name: account.name,
+      password: account.password || (existing && existing.password) || defaultStaffPassword
+    };
+  });
+  return accounts.filter((account, index, list) => (
+    list.findIndex((item) => item.name.toLowerCase() === account.name.toLowerCase()) === index
+  ));
+}
+
+function renderStaffAccountManager() {
+  if (!els.staffAccountList) return;
+  const accounts = staffAccountsFromAdminForm();
+  els.staffAccountList.innerHTML = '';
+  accounts.forEach((account, index) => {
+    const row = document.createElement('article');
+    row.className = 'account-row';
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(account.name)}</strong>
+        <span>Password</span>
+      </div>
+      <input type="text" value="${escapeHtml(account.password)}" data-account-password="${index}" aria-label="Password for ${escapeHtml(account.name)}" />
+      <button class="delete-btn" type="button" data-delete-account="${index}">Delete</button>
+    `;
+    els.staffAccountList.append(row);
+  });
 }
 
 function passwordForStaff(name) {
@@ -1020,6 +1075,9 @@ function saveAccomplishment(event) {
 
 function showAdminSettings() {
   els.staffNamesInput.value = staffAccountLines();
+  els.newStaffNameInput.value = '';
+  els.newStaffPasswordInput.value = '';
+  renderStaffAccountManager();
   els.staffPasswordInput.value = state.access.staffPassword;
   els.viewerPasswordInput.value = state.access.viewerPassword;
   els.adminPasswordInput.value = state.access.adminPassword;
@@ -1033,7 +1091,7 @@ function showAdminSettings() {
   els.approvedByInput.value = state.signatories.approvedBy;
   els.approvedByTitleInput.value = state.signatories.approvedByTitle;
   els.adminModal.classList.remove('hidden');
-  els.staffNamesInput.focus();
+  els.newStaffNameInput.focus();
 }
 
 function hideAdminSettings() {
@@ -1043,20 +1101,10 @@ function hideAdminSettings() {
 function saveAdminSettings(event) {
   event.preventDefault();
   const defaultStaffPassword = els.staffPasswordInput.value.trim() || defaultAccess.staffPassword;
-  const previousAccounts = state.access.staffAccounts || [];
-  const accounts = els.staffNamesInput.value
-    .split('\n')
-    .map((line) => {
-      const [namePart, passwordPart] = line.split('|');
-      const name = (namePart || '').trim();
-      const existing = previousAccounts.find((account) => account.name === name);
-      const password = (passwordPart || '').trim() || (existing && existing.password) || defaultStaffPassword;
-      return { name, password };
-    })
-    .filter((account) => account.name);
-  const uniqueAccounts = accounts.filter((account, index, list) => (
-    list.findIndex((item) => item.name.toLowerCase() === account.name.toLowerCase()) === index
-  ));
+  const uniqueAccounts = staffAccountsFromAdminForm().map((account) => ({
+    ...account,
+    password: account.password || defaultStaffPassword
+  }));
   if (!uniqueAccounts.length) {
     alert('Please keep at least one staff account.');
     return;
@@ -1196,6 +1244,47 @@ function bindEvents() {
   document.querySelector('#adminBtn').addEventListener('click', showAdminSettings);
   document.querySelector('#closeAdminBtn').addEventListener('click', hideAdminSettings);
   document.querySelector('#adminForm').addEventListener('submit', saveAdminSettings);
+  els.addStaffAccountBtn.addEventListener('click', () => {
+    const name = els.newStaffNameInput.value.trim();
+    const password = els.newStaffPasswordInput.value.trim() || els.staffPasswordInput.value.trim() || defaultAccess.staffPassword;
+    if (!name) {
+      alert('Please enter the staff name.');
+      return;
+    }
+    const accounts = staffAccountsFromAdminForm();
+    const existing = accounts.find((account) => account.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      existing.password = password;
+    } else {
+      accounts.push({ name, password });
+    }
+    syncStaffAccountTextarea(accounts);
+    els.newStaffNameInput.value = '';
+    els.newStaffPasswordInput.value = '';
+    renderStaffAccountManager();
+    els.newStaffNameInput.focus();
+  });
+  els.staffNamesInput.addEventListener('input', renderStaffAccountManager);
+  els.staffAccountList.addEventListener('input', (event) => {
+    const input = event.target.closest('input[data-account-password]');
+    if (!input) return;
+    const accounts = staffAccountsFromAdminForm();
+    const index = Number(input.dataset.accountPassword);
+    if (accounts[index]) accounts[index].password = input.value.trim();
+    syncStaffAccountTextarea(accounts);
+  });
+  els.staffAccountList.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-delete-account]');
+    if (!button) return;
+    const accounts = staffAccountsFromAdminForm();
+    const index = Number(button.dataset.deleteAccount);
+    const account = accounts[index];
+    if (!account) return;
+    if (!confirm(`Delete staff account for ${account.name}? Existing encoded reports will remain in the records.`)) return;
+    accounts.splice(index, 1);
+    syncStaffAccountTextarea(accounts);
+    renderStaffAccountManager();
+  });
   document.querySelector('#restoreStaffBtn').addEventListener('click', () => {
     if (!confirm('Restore the default staff list?')) return;
     state.staff = [...defaultStaff];
@@ -1203,6 +1292,7 @@ function bindEvents() {
     state.access.staffPassword = defaultAccess.staffPassword;
     state.access.staffAccounts = officialStaffAccounts.map((account) => ({ ...account }));
     els.staffNamesInput.value = staffAccountLines();
+    renderStaffAccountManager();
     saveStaff();
     saveAccess();
     populateStaffSelects();

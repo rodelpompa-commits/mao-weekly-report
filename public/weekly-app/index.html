@@ -431,7 +431,24 @@
           <button id="closeAdminBtn" class="subtle-btn" type="button">Close</button>
         </div>
         <form id="adminForm">
-          <div class="field">
+          <section class="account-manager" aria-label="Staff account manager">
+            <div class="section-heading">
+              <h3>Staff Accounts</h3>
+            </div>
+            <div class="add-staff-grid">
+              <div class="field">
+                <label for="newStaffNameInput">Staff Name</label>
+                <input id="newStaffNameInput" type="text" placeholder="Full name" />
+              </div>
+              <div class="field">
+                <label for="newStaffPasswordInput">Password</label>
+                <input id="newStaffPasswordInput" type="text" placeholder="Password" />
+              </div>
+              <button id="addStaffAccountBtn" class="primary-btn" type="button">Add Staff</button>
+            </div>
+            <div id="staffAccountList" class="account-list"></div>
+          </section>
+          <div class="field raw-account-field">
             <label for="staffNamesInput">Staff Accounts</label>
             <textarea id="staffNamesInput" rows="12" required placeholder="Example: RODEL L. POMPA | rodel123"></textarea>
           </div>
