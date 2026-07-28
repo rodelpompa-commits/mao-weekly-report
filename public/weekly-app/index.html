@@ -3,7 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1267b1" />
     <title>Weekly Itinerary and Accomplishment Monitor</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/mao-weekly-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/mao-weekly-icon.svg" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -39,6 +43,7 @@
       </div>
       <div class="topbar-actions">
         <span id="sessionBadge" class="session-badge">Staff</span>
+        <button id="installAppBtn" class="icon-btn hidden" type="button">Install App</button>
         <button id="adminBtn" class="icon-btn" type="button">Admin Settings</button>
         <button id="printBtn" class="icon-btn" type="button">Print</button>
         <button id="exportBtn" class="primary-btn" type="button">Export CSV</button>

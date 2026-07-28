@@ -130,6 +130,7 @@ const els = {
   averageAdjustedScore: document.querySelector('#averageAdjustedScore'),
   performanceChart: document.querySelector('#performanceChart'),
   fieldMap: document.querySelector('#fieldMap'),
+  installAppBtn: document.querySelector('#installAppBtn'),
   adminModal: document.querySelector('#adminModal'),
   staffNamesInput: document.querySelector('#staffNamesInput'),
   staffPasswordInput: document.querySelector('#staffPasswordInput'),
@@ -151,6 +152,8 @@ const els = {
   approvedByPrint: document.querySelector('#approvedByPrint'),
   approvedByTitlePrint: document.querySelector('#approvedByTitlePrint')
 };
+
+let deferredInstallPrompt = null;
 
 function reportItemInputs() {
   return Array.from(document.querySelectorAll('input[name="reportItem"]'));
@@ -784,6 +787,40 @@ function loadBoundary() {
     });
 }
 
+function setupInstallPrompt() {
+  if (!els.installAppBtn) return;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (isStandalone) return;
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    els.installAppBtn.classList.remove('hidden');
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    els.installAppBtn.classList.add('hidden');
+  });
+}
+
+function installApp() {
+  if (!deferredInstallPrompt) {
+    alert('On Android Chrome, open the menu and choose Add to Home screen or Install app.');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.finally(() => {
+    deferredInstallPrompt = null;
+    els.installAppBtn.classList.add('hidden');
+  });
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+
 function applyAccessRules() {
   const loggedIn = Boolean(state.session.role);
   els.loginScreen.classList.toggle('hidden', loggedIn);
@@ -792,6 +829,7 @@ function applyAccessRules() {
   document.querySelector('#adminBtn').classList.toggle('hidden', !isAdmin());
   document.querySelector('#printBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
   document.querySelector('#exportBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
+  if (deferredInstallPrompt && els.installAppBtn) els.installAppBtn.classList.remove('hidden');
   document.querySelector('[data-view="dashboardView"]').classList.toggle('hidden', !(isAdmin() || isViewer()));
   document.querySelector('#resetBtn').classList.toggle('hidden', !isAdmin());
   document.querySelector('#addPlanBtn').classList.toggle('hidden', !(isAdmin() || (isStaff() && state.access.staffCanPlan)));
@@ -1174,6 +1212,7 @@ function bindEvents() {
     if (event.target === els.adminModal) hideAdminSettings();
   });
   document.querySelector('#exportBtn').addEventListener('click', exportCsv);
+  els.installAppBtn.addEventListener('click', installApp);
   document.querySelector('#printBtn').addEventListener('click', () => window.print());
   document.querySelector('#logoutBtn').addEventListener('click', handleLogout);
   reportItemInputs().forEach((input) => input.addEventListener('change', updateReportGradePreview));
@@ -1227,5 +1266,7 @@ loadSession();
 populateStaffSelects();
 loadPlans();
 bindEvents();
+setupInstallPrompt();
+registerServiceWorker();
 loadBoundary();
 renderAll();
