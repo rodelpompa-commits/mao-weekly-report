@@ -1336,6 +1336,50 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
+function printCleanReport() {
+  const printFrame = document.createElement('iframe');
+  const cssUrl = new URL('styles.css', window.location.href).href;
+  printFrame.setAttribute('aria-hidden', 'true');
+  printFrame.style.border = '0';
+  printFrame.style.height = '0';
+  printFrame.style.left = '-9999px';
+  printFrame.style.position = 'fixed';
+  printFrame.style.top = '0';
+  printFrame.style.width = '0';
+  document.body.appendChild(printFrame);
+
+  const printDocument = printFrame.contentWindow.document;
+  printDocument.open();
+  printDocument.write(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MAO Weekly Report</title>
+    <link rel="stylesheet" href="${cssUrl}" />
+    <style>
+      @page { margin: 12mm; }
+      html, body { background: #fff; }
+    </style>
+  </head>
+  <body class="${document.body.className}">
+    <header class="topbar">${document.querySelector('.topbar').innerHTML}</header>
+    <main class="layout">${document.querySelector('.layout').innerHTML}</main>
+  </body>
+</html>`);
+  printDocument.close();
+
+  const removeFrame = () => {
+    setTimeout(() => printFrame.remove(), 500);
+  };
+
+  printFrame.onload = () => {
+    printFrame.contentWindow.focus();
+    printFrame.contentWindow.onafterprint = removeFrame;
+    printFrame.contentWindow.print();
+    setTimeout(removeFrame, 3000);
+  };
+}
+
 function handleLogin(event) {
   event.preventDefault();
   const role = els.loginRole.value;
@@ -1459,7 +1503,7 @@ function bindEvents() {
   });
   document.querySelector('#exportBtn').addEventListener('click', exportCsv);
   els.installAppBtn.addEventListener('click', installApp);
-  document.querySelector('#printBtn').addEventListener('click', () => window.print());
+  document.querySelector('#printBtn').addEventListener('click', printCleanReport);
   document.querySelector('#logoutBtn').addEventListener('click', handleLogout);
   els.reportDetails.addEventListener('input', updateReportGradePreview);
   els.accomplishmentOutput.addEventListener('input', updateReportGradePreview);
