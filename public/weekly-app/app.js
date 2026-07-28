@@ -633,6 +633,13 @@ function renderAccomplishmentRows() {
     const grade = reportGrade(plan);
     const gradeHtml = `<span class="grade ${reportGradeClass(grade)}">${reportGradeText(plan)}</span>`;
     const canEncode = isAdmin() || (isStaff() && state.access.staffCanAccomplish);
+    const accomplishmentActions = [];
+    if (canEncode) {
+      accomplishmentActions.push(`<button class="primary-btn" type="button" data-action="encode" data-id="${plan.id}">Encode</button>`);
+    }
+    if (isAdmin() && plan.accomplishmentType) {
+      accomplishmentActions.push(`<button class="delete-btn" type="button" data-action="delete-accomplishment" data-id="${plan.id}">Remove Accomplishment</button>`);
+    }
     row.innerHTML = `
       <td>${escapeHtml(plan.staffName)}</td>
       <td>${escapeHtml(plan.datePlanned)}</td>
@@ -645,7 +652,7 @@ function renderAccomplishmentRows() {
       <td>${escapeHtml(ratingEffect(plan))}</td>
       <td>
         <div class="row-actions">
-          ${canEncode ? `<button class="primary-btn" type="button" data-action="encode" data-id="${plan.id}">Encode</button>` : '<span class="staff-meta">View only</span>'}
+          ${accomplishmentActions.join('') || '<span class="staff-meta">View only</span>'}
         </div>
       </td>
     `;
@@ -1124,6 +1131,29 @@ function saveAccomplishment(event) {
   renderAll();
 }
 
+function removeAccomplishment(plan) {
+  const isBossOnlyTask = plan.accomplishmentType === 'Boss Instruction' && plan.task === plan.accomplishmentOutput;
+  if (isBossOnlyTask) {
+    if (!confirm('Delete this boss-instructed accomplishment entry?')) return;
+    state.plans = state.plans.filter((item) => item.id !== plan.id);
+  } else {
+    if (!confirm('Remove the encoded accomplishment for this itinerary? The planned itinerary will remain.')) return;
+    delete plan.accomplishmentType;
+    delete plan.accomplishmentDate;
+    delete plan.accomplishmentPercent;
+    delete plan.accomplishmentOutput;
+    delete plan.justification;
+    delete plan.reportDetails;
+    delete plan.reportItems;
+    delete plan.taLatitude;
+    delete plan.taLongitude;
+    delete plan.taLocationCapturedAt;
+    delete plan.taPhotoData;
+  }
+  savePlans();
+  renderAll();
+}
+
 function showAdminSettings() {
   els.staffNamesInput.value = staffAccountLines();
   els.newStaffNameInput.value = '';
@@ -1398,6 +1428,9 @@ function bindEvents() {
       state.plans = state.plans.filter((item) => item.id !== plan.id);
       savePlans();
       renderAll();
+    }
+    if (button.dataset.action === 'delete-accomplishment' && plan && isAdmin()) {
+      removeAccomplishment(plan);
     }
   });
 }
