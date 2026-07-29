@@ -1337,18 +1337,14 @@ function exportCsv() {
 }
 
 function printCleanReport() {
-  const printFrame = document.createElement('iframe');
   const cssUrl = new URL('styles.css', window.location.href).href;
-  printFrame.setAttribute('aria-hidden', 'true');
-  printFrame.style.border = '0';
-  printFrame.style.height = '0';
-  printFrame.style.left = '-9999px';
-  printFrame.style.position = 'fixed';
-  printFrame.style.top = '0';
-  printFrame.style.width = '0';
-  document.body.appendChild(printFrame);
+  const printWindow = window.open('', 'mao-weekly-report-print', 'popup,width=1100,height=800');
+  if (!printWindow) {
+    alert('Please allow pop-ups for printing, then try again.');
+    return;
+  }
 
-  const printDocument = printFrame.contentWindow.document;
+  const printDocument = printWindow.document;
   printDocument.open();
   printDocument.write(`<!doctype html>
 <html lang="en">
@@ -1357,8 +1353,22 @@ function printCleanReport() {
     <title>MAO Weekly Report</title>
     <link rel="stylesheet" href="${cssUrl}" />
     <style>
-      @page { margin: 12mm; }
-      html, body { background: #fff; }
+      @page { margin: 0; size: auto; }
+      html, body { background: #fff; margin: 0; }
+      body { padding: 12mm; }
+      .topbar-actions,
+      .login-screen,
+      .controls-panel,
+      .tabs,
+      .entry-form,
+      .row-actions,
+      #addPlanBtn,
+      #addBossTaskBtn,
+      #resetBtn,
+      .modal-backdrop,
+      .actions-col {
+        display: none !important;
+      }
     </style>
   </head>
   <body class="${document.body.className}">
@@ -1368,15 +1378,15 @@ function printCleanReport() {
 </html>`);
   printDocument.close();
 
-  const removeFrame = () => {
-    setTimeout(() => printFrame.remove(), 500);
+  const closePrintWindow = () => {
+    setTimeout(() => printWindow.close(), 500);
   };
 
-  printFrame.onload = () => {
-    printFrame.contentWindow.focus();
-    printFrame.contentWindow.onafterprint = removeFrame;
-    printFrame.contentWindow.print();
-    setTimeout(removeFrame, 3000);
+  printWindow.onload = () => {
+    printWindow.focus();
+    printWindow.onafterprint = closePrintWindow;
+    printWindow.print();
+    setTimeout(closePrintWindow, 3000);
   };
 }
 
