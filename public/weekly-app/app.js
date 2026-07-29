@@ -66,6 +66,10 @@ const staffStorageKey = 'weekly-accomplishment-staff-v1';
 const signatoryStorageKey = 'weekly-accomplishment-signatories-v1';
 const accessStorageKey = 'weekly-accomplishment-access-v1';
 const sessionStorageKey = 'weekly-accomplishment-session-v1';
+const sharedStateEndpoint = '/api/weekly-state';
+let sharedStateReady = false;
+let sharedSaveTimer = null;
+let applyingSharedState = false;
 
 const defaultSignatories = {
   preparedBy: 'Staff / Encoder',
@@ -419,6 +423,7 @@ function loadStaff() {
 
 function saveStaff() {
   localStorage.setItem(staffStorageKey, JSON.stringify(state.staff));
+  scheduleSharedStateSave();
 }
 
 function loadSignatories() {
@@ -440,6 +445,7 @@ function loadSignatories() {
 
 function saveSignatories() {
   localStorage.setItem(signatoryStorageKey, JSON.stringify(state.signatories));
+  scheduleSharedStateSave();
 }
 
 function renderSignatories() {
@@ -481,6 +487,7 @@ function loadAccess() {
 
 function saveAccess() {
   localStorage.setItem(accessStorageKey, JSON.stringify(state.access));
+  scheduleSharedStateSave();
 }
 
 function loadSession() {
@@ -499,11 +506,114 @@ function clearSession() {
 
 function loadPlans() {
   const stored = localStorage.getItem(storageKey);
-  state.plans = stored ? JSON.parse(stored) : samplePlans();
+  state.plans = stored ? JSON.parse(stored) : [];
 }
 
 function savePlans() {
   localStorage.setItem(storageKey, JSON.stringify(state.plans));
+  scheduleSharedStateSave();
+}
+
+function sharedStatePayload() {
+  return {
+    plans: state.plans,
+    staff: state.staff,
+    access: state.access,
+    signatories: state.signatories
+  };
+}
+
+function hasSharedStateData(payload) {
+  return Boolean(
+    payload &&
+    (
+      (Array.isArray(payload.plans) && payload.plans.length) ||
+      (Array.isArray(payload.staff) && payload.staff.length) ||
+      (payload.access && Object.keys(payload.access).length) ||
+      (payload.signatories && Object.keys(payload.signatories).length)
+    )
+  );
+}
+
+function mergePlans(remotePlans = [], localPlans = []) {
+  const byId = new Map();
+  [...remotePlans, ...localPlans].forEach((plan) => {
+    if (!plan || !plan.id) return;
+    byId.set(plan.id, { ...byId.get(plan.id), ...plan });
+  });
+  return [...byId.values()];
+}
+
+function persistSharedStateLocally() {
+  localStorage.setItem(storageKey, JSON.stringify(state.plans));
+  localStorage.setItem(staffStorageKey, JSON.stringify(state.staff));
+  localStorage.setItem(accessStorageKey, JSON.stringify(state.access));
+  localStorage.setItem(signatoryStorageKey, JSON.stringify(state.signatories));
+}
+
+async function pushSharedState() {
+  try {
+    const response = await fetch(sharedStateEndpoint, { cache: 'no-store' });
+    if (response.ok) {
+      const remoteState = await response.json();
+      if (hasSharedStateData(remoteState)) {
+        state.plans = mergePlans(remoteState.plans, state.plans);
+        localStorage.setItem(storageKey, JSON.stringify(state.plans));
+      }
+    }
+  } catch (error) {
+    console.warn('Shared merge failed before save', error);
+  }
+
+  await fetch(sharedStateEndpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(sharedStatePayload())
+  });
+}
+
+function scheduleSharedStateSave() {
+  if (!sharedStateReady || applyingSharedState) return;
+  clearTimeout(sharedSaveTimer);
+  sharedSaveTimer = setTimeout(() => {
+    pushSharedState().catch((error) => console.warn('Shared save failed', error));
+  }, 500);
+}
+
+async function initializeSharedState() {
+  try {
+    const response = await fetch(sharedStateEndpoint, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Shared storage unavailable (${response.status})`);
+    const remoteState = await response.json();
+
+    applyingSharedState = true;
+    if (hasSharedStateData(remoteState)) {
+      const mergedPlans = mergePlans(remoteState.plans, state.plans);
+      const localAddedRecords = mergedPlans.length > (Array.isArray(remoteState.plans) ? remoteState.plans.length : 0);
+
+      state.plans = mergedPlans;
+      state.access = { ...defaultAccess, ...(remoteState.access || {}) };
+      state.signatories = { ...defaultSignatories, ...(remoteState.signatories || {}) };
+      state.staff = Array.isArray(remoteState.staff) && remoteState.staff.length
+        ? remoteState.staff.filter(Boolean)
+        : state.access.staffAccounts.map((account) => account.name).filter(Boolean);
+
+      persistSharedStateLocally();
+      populateStaffSelects();
+      renderAll();
+
+      if (localAddedRecords) {
+        await pushSharedState();
+      }
+    } else {
+      await pushSharedState();
+    }
+  } catch (error) {
+    console.warn('Shared storage is unavailable; using this device only for now.', error);
+  } finally {
+    applyingSharedState = false;
+    sharedStateReady = true;
+  }
 }
 
 function populateStaffSelects() {
@@ -1613,3 +1723,4 @@ setupInstallPrompt();
 registerServiceWorker();
 loadBoundary();
 renderAll();
+initializeSharedState();
