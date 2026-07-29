@@ -1,29 +1,29 @@
 const officialRosterVersion = '2026-official-staff-01';
 const officialStaffAccounts = [
-  { name: 'Rodel L. Pompa', password: '1001' },
-  { name: 'John Aldrich R. Vinzon', password: '1002' },
-  { name: 'Mila D. Lim', password: '1003' },
-  { name: 'Richelle M. Degala', password: '1004' },
-  { name: 'Eng. Hidy C. Flores', password: '1005' },
-  { name: 'Kristine Joy M. Torres', password: '1006' },
-  { name: 'Mellette B. Musico', password: '1007' },
-  { name: 'Rose Ann O. Marasigan', password: '1008' },
-  { name: 'Lorie May S. Tabilisma', password: '1009' },
-  { name: 'Jess Mark R. Macalalad', password: '1010' },
-  { name: 'Aleckz Andrea Rose M. Marayan', password: '1011' },
-  { name: 'Kezzer G. Fabregas', password: '1012' },
-  { name: 'Dra. Ithiel M. Maalihan', password: '1013' },
-  { name: 'Robert A. Merabete, Jr.', password: '1014' },
-  { name: 'Richman M. Bugarin', password: '1015' },
-  { name: 'Princess Joy C. Villarba', password: '1016' },
-  { name: 'Joshua Vargas', password: '1017' },
-  { name: 'Diana Rose Pedragoza', password: '1018' },
-  { name: 'Jaime M. Cupiado', password: '1019' },
-  { name: 'Aquilito S. Constantino', password: '1020' },
-  { name: 'Junnel F. Hernandez', password: '1021' },
-  { name: 'Elias G. Burgos', password: '1022' },
-  { name: 'Cheridan M. Faildo', password: '1023' },
-  { name: 'Melanio O. Mapacpac', password: '1024' }
+  { name: 'Rodel L. Pompa' },
+  { name: 'John Aldrich R. Vinzon' },
+  { name: 'Mila D. Lim' },
+  { name: 'Richelle M. Degala' },
+  { name: 'Eng. Hidy C. Flores' },
+  { name: 'Kristine Joy M. Torres' },
+  { name: 'Mellette B. Musico' },
+  { name: 'Rose Ann O. Marasigan' },
+  { name: 'Lorie May S. Tabilisma' },
+  { name: 'Jess Mark R. Macalalad' },
+  { name: 'Aleckz Andrea Rose M. Marayan' },
+  { name: 'Kezzer G. Fabregas' },
+  { name: 'Dra. Ithiel M. Maalihan' },
+  { name: 'Robert A. Merabete, Jr.' },
+  { name: 'Richman M. Bugarin' },
+  { name: 'Princess Joy C. Villarba' },
+  { name: 'Joshua Vargas' },
+  { name: 'Diana Rose Pedragoza' },
+  { name: 'Jaime M. Cupiado' },
+  { name: 'Aquilito S. Constantino' },
+  { name: 'Junnel F. Hernandez' },
+  { name: 'Elias G. Burgos' },
+  { name: 'Cheridan M. Faildo' },
+  { name: 'Melanio O. Mapacpac' }
 ];
 const defaultStaff = officialStaffAccounts.map((account) => account.name);
 
@@ -67,6 +67,8 @@ const signatoryStorageKey = 'weekly-accomplishment-signatories-v1';
 const accessStorageKey = 'weekly-accomplishment-access-v1';
 const sessionStorageKey = 'weekly-accomplishment-session-v1';
 const sharedStateEndpoint = '/api/weekly-state';
+const loginEndpoint = '/api/login';
+const logoutEndpoint = '/api/logout';
 let sharedStateReady = false;
 let sharedSaveTimer = null;
 let applyingSharedState = false;
@@ -82,9 +84,9 @@ const defaultSignatories = {
 
 const defaultAccess = {
   rosterVersion: officialRosterVersion,
-  staffPassword: '1001',
-  adminPassword: 'mao2026',
-  viewerPassword: 'viewer123',
+  staffPassword: '',
+  adminPassword: '',
+  viewerPassword: '',
   staffAccounts: officialStaffAccounts.map((account) => ({ ...account })),
   staffCanPlan: true,
   staffCanAccomplish: true,
@@ -207,6 +209,10 @@ function isViewer() {
 
 function staffAccountLines() {
   return state.access.staffAccounts.map((account) => `${account.name} | ${account.password}`).join('\n');
+}
+
+function authHeaders() {
+  return state.session.token ? { authorization: `Bearer ${state.session.token}` } : {};
 }
 
 function parseStaffAccountLines(value) {
@@ -501,7 +507,7 @@ function saveSession() {
 
 function clearSession() {
   sessionStorage.removeItem(sessionStorageKey);
-  state.session = { role: '', staffName: '' };
+  state.session = { role: '', staffName: '', token: '' };
 }
 
 function loadPlans() {
@@ -553,7 +559,7 @@ function persistSharedStateLocally() {
 
 async function pushSharedState() {
   try {
-    const response = await fetch(sharedStateEndpoint, { cache: 'no-store' });
+    const response = await fetch(sharedStateEndpoint, { cache: 'no-store', headers: authHeaders() });
     if (response.ok) {
       const remoteState = await response.json();
       if (hasSharedStateData(remoteState)) {
@@ -567,7 +573,7 @@ async function pushSharedState() {
 
   await fetch(sharedStateEndpoint, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...authHeaders() },
     body: JSON.stringify(sharedStatePayload())
   });
 }
@@ -582,7 +588,7 @@ function scheduleSharedStateSave() {
 
 async function initializeSharedState() {
   try {
-    const response = await fetch(sharedStateEndpoint, { cache: 'no-store' });
+    const response = await fetch(sharedStateEndpoint, { cache: 'no-store', headers: authHeaders() });
     if (!response.ok) throw new Error(`Shared storage unavailable (${response.status})`);
     const remoteState = await response.json();
 
@@ -602,10 +608,10 @@ async function initializeSharedState() {
       populateStaffSelects();
       renderAll();
 
-      if (localAddedRecords) {
+      if (localAddedRecords && state.session.token) {
         await pushSharedState();
       }
-    } else {
+    } else if (state.session.token) {
       await pushSharedState();
     }
   } catch (error) {
@@ -1500,33 +1506,44 @@ function printCleanReport() {
   };
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
   event.preventDefault();
   const role = els.loginRole.value;
   const password = els.loginPassword.value;
-  if (role === 'admin' && password === state.access.adminPassword) {
-    state.session = { role: 'admin', staffName: '' };
-  } else if (role === 'viewer' && password === state.access.viewerPassword) {
-    state.session = { role: 'viewer', staffName: '' };
-  } else if (role === 'staff') {
-    const staffName = els.loginStaff.value;
-    if (password !== passwordForStaff(staffName)) {
-      els.loginMessage.textContent = 'Incorrect password. Please try again.';
+  const staffName = role === 'staff' ? els.loginStaff.value : '';
+
+  try {
+    const response = await fetch(loginEndpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ role, staffName, password })
+    });
+    const result = await response.json();
+    if (!response.ok || !result.token) {
+      els.loginMessage.textContent = result.error || 'Incorrect password. Please try again.';
       return;
     }
-    state.session = { role: 'staff', staffName };
-    state.staffFilter = els.loginStaff.value;
-  } else {
-    els.loginMessage.textContent = 'Incorrect password. Please try again.';
+    state.session = { role: result.role, staffName: result.staffName || '', token: result.token };
+    if (state.session.role === 'staff') state.staffFilter = state.session.staffName;
+  } catch (error) {
+    els.loginMessage.textContent = 'Login is unavailable. Please check the internet connection.';
     return;
   }
+
   els.loginPassword.value = '';
   els.loginMessage.textContent = '';
   saveSession();
+  await initializeSharedState();
   renderAll();
 }
 
 function handleLogout() {
+  if (state.session.token) {
+    fetch(logoutEndpoint, {
+      method: 'POST',
+      headers: authHeaders()
+    }).catch(() => {});
+  }
   clearSession();
   hidePlanForm();
   hideAccomplishmentForm();
