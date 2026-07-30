@@ -30,7 +30,7 @@ const worker = {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders() });
+      return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
 
     if (url.pathname === "/api/weekly-state") {
@@ -120,7 +120,7 @@ const defaultSignatories = {
 
 async function handleWeeklyState(request: Request, env: Env): Promise<Response> {
   if (!env.DB) {
-    return jsonResponse({ error: "Shared database is not available yet." }, 503);
+    return jsonResponse({ error: "Shared database is not available yet." }, 503, request);
   }
 
   await ensureWeeklyTables(env.DB);
@@ -133,12 +133,12 @@ async function handleWeeklyState(request: Request, env: Env): Promise<Response> 
       .first<{ value: string }>();
 
     const storedState = row ? JSON.parse(row.value) : null;
-    return jsonResponse(await stateForClient(env.DB, storedState, session?.role === "admin"));
+    return jsonResponse(await stateForClient(env.DB, storedState, session?.role === "admin"), 200, request);
   }
 
   if (request.method === "POST") {
     const session = await getSession(request, env.DB);
-    if (!session) return jsonResponse({ error: "Please log in again before saving." }, 401);
+    if (!session) return jsonResponse({ error: "Please log in again before saving." }, 401, request);
 
     const body = await request.json<WeeklyState>();
     const current = await env.DB
@@ -168,15 +168,15 @@ async function handleWeeklyState(request: Request, env: Env): Promise<Response> 
       .bind(weeklyStateKey, JSON.stringify(nextState), nextState.updatedAt)
       .run();
 
-    return jsonResponse(nextState);
+    return jsonResponse(nextState, 200, request);
   }
 
-  return jsonResponse({ error: "Method not allowed." }, 405);
+  return jsonResponse({ error: "Method not allowed." }, 405, request);
 }
 
 async function handleLogin(request: Request, env: Env): Promise<Response> {
-  if (!env.DB) return jsonResponse({ error: "Shared database is not available yet." }, 503);
-  if (request.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405);
+  if (!env.DB) return jsonResponse({ error: "Shared database is not available yet." }, 503, request);
+  if (request.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405, request);
 
   await ensureWeeklyTables(env.DB);
   const body = await request.json<{ role?: string; staffName?: string; password?: string }>();
@@ -190,7 +190,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     .bind(role, name, password)
     .first<{ role: string; name: string }>();
 
-  if (!account) return jsonResponse({ error: "Incorrect password. Please try again." }, 401);
+  if (!account) return jsonResponse({ error: "Incorrect password. Please try again." }, 401, request);
 
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000).toISOString();
@@ -203,17 +203,17 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     token,
     role: account.role,
     staffName: account.role === "staff" ? account.name : "",
-  });
+  }, 200, request);
 }
 
 async function handleLogout(request: Request, env: Env): Promise<Response> {
-  if (!env.DB) return jsonResponse({ ok: true });
+  if (!env.DB) return jsonResponse({ ok: true }, 200, request);
   await ensureWeeklyTables(env.DB);
   const token = bearerToken(request);
   if (token) {
     await env.DB.prepare("DELETE FROM auth_sessions WHERE token = ?").bind(token).run();
   }
-  return jsonResponse({ ok: true });
+  return jsonResponse({ ok: true }, 200, request);
 }
 
 async function ensureWeeklyTables(db: D1Database): Promise<void> {
@@ -315,20 +315,27 @@ function bearerToken(request: Request): string {
   return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
 }
 
-function jsonResponse(data: unknown, status = 200): Response {
+function jsonResponse(data: unknown, status = 200, request?: Request): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      ...corsHeaders(),
+      ...corsHeaders(request),
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
     },
   });
 }
 
-function corsHeaders(): HeadersInit {
+function corsHeaders(request?: Request): HeadersInit {
+  const origin = request?.headers.get("origin") || "";
+  const allowedOrigins = new Set([
+    "https://rodelpompa-commits.github.io",
+    "https://weekly-accomplishment-monitor.daphneisolde.chatgpt.site",
+  ]);
+  const allowOrigin = allowedOrigins.has(origin) ? origin : "https://weekly-accomplishment-monitor.daphneisolde.chatgpt.site";
   return {
-    "access-control-allow-origin": "*",
+    "access-control-allow-origin": allowOrigin,
+    "vary": "Origin",
     "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-allow-headers": "authorization, content-type",
     "access-control-max-age": "86400",
