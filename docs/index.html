@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1267b1" />
+    <title>Weekly Itinerary and Accomplishment Monitor</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/mao-weekly-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/mao-weekly-icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen" aria-label="Login">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Weekly Report Access</p>
+        <h1>Sign In</h1>
+        <div class="field">
+          <label for="loginRole">Role</label>
+          <select id="loginRole" required>
+            <option value="staff">Staff</option>
+            <option value="viewer">Viewer</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div id="loginStaffField" class="field">
+          <label for="loginStaff">Staff Name</label>
+          <select id="loginStaff"></select>
+        </div>
+        <div class="field">
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" required />
+        </div>
+        <button class="primary-btn" type="submit">Open Report</button>
+        <p id="loginMessage" class="login-message"></p>
+      </form>
+    </section>
+
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Itinerary Based Monitoring</p>
+        <h1>Weekly Accomplishment Report</h1>
+      </div>
+      <div class="topbar-actions">
+        <span id="sessionBadge" class="session-badge">Staff</span>
+        <button id="installAppBtn" class="icon-btn hidden" type="button">Install App</button>
+        <button id="adminBtn" class="icon-btn" type="button">Admin Settings</button>
+        <button id="printBtn" class="icon-btn" type="button">Print</button>
+        <button id="exportBtn" class="primary-btn" type="button">Export CSV</button>
+        <button id="logoutBtn" class="subtle-btn" type="button">Logout</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel controls-panel" aria-label="Report controls">
+        <div class="field">
+          <label for="weekStart">Week Start</label>
+          <input id="weekStart" type="date" />
+        </div>
+        <div class="field">
+          <label for="weekEnd">Week End</label>
+          <input id="weekEnd" type="date" />
+        </div>
+        <div class="field">
+          <label for="staffFilter">Staff</label>
+          <select id="staffFilter"></select>
+        </div>
+        <div class="field">
+          <label for="programFilter">Program</label>
+          <select id="programFilter">
+            <option value="All">All programs</option>
+            <option>Rice</option>
+            <option>HVCC</option>
+            <option>Livestock</option>
+            <option>Fishery</option>
+            <option>Biosystems Engineering</option>
+          </select>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="Main views">
+        <button class="tab active" type="button" data-view="itineraryView">Plan Itinerary</button>
+        <button class="tab" type="button" data-view="accomplishmentView">Encode Accomplishment</button>
+        <button class="tab" type="button" data-view="dashboardView">Admin Dashboard</button>
+      </nav>
+
+      <section class="metrics" aria-label="Weekly summary">
+        <article class="metric">
+          <span>Planned Tasks</span>
+          <strong id="plannedTasks">0</strong>
+        </article>
+        <article class="metric">
+          <span>Conducted</span>
+          <strong id="conductedTasks">0</strong>
+        </article>
+        <article class="metric">
+          <span>Needs Justification</span>
+          <strong id="justificationNeeded">0</strong>
+        </article>
+        <article class="metric">
+          <span>Staff Efficiency</span>
+          <strong id="overallEfficiency">0%</strong>
+        </article>
+        <article class="metric">
+          <span>TA Report Grade</span>
+          <strong id="overallReportGrade">0%</strong>
+        </article>
+      </section>
+
+      <section id="itineraryView" class="view active">
+        <section class="task-panel" aria-label="Itinerary planner">
+          <div class="section-heading">
+            <h2>Monday to Friday Itinerary</h2>
+            <button id="addPlanBtn" class="primary-btn" type="button">Add Itinerary</button>
+          </div>
+
+          <form id="planForm" class="entry-form hidden">
+            <input type="hidden" id="planId" />
+            <div class="field">
+              <label for="planStaff">Staff</label>
+              <select id="planStaff" required></select>
+            </div>
+            <div class="field">
+              <label for="planDate">Date to be Conducted</label>
+              <input id="planDate" type="date" required />
+            </div>
+            <div class="field">
+              <label for="planProgram">Program</label>
+              <select id="planProgram" required>
+                <option>Rice</option>
+                <option>HVCC</option>
+                <option>Livestock</option>
+                <option>Fishery</option>
+                <option>Biosystems Engineering</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="planWorkType">Work Type</label>
+              <select id="planWorkType" required>
+                <option>Regular Work</option>
+                <option>Planning</option>
+                <option>Mapping</option>
+                <option>System Maintenance</option>
+                <option>System Creation</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="planPlace">Place</label>
+              <input id="planPlace" type="text" required />
+            </div>
+            <div class="field wide">
+              <label for="planTask">Task / Activity</label>
+              <input id="planTask" type="text" required />
+            </div>
+            <div class="field wide">
+              <label for="planClients">Clients to be Contacted</label>
+              <textarea id="planClients" rows="2"></textarea>
+            </div>
+            <label class="setting-check full">
+              <input id="planTechnicalAssistance" type="checkbox" />
+              Technical assistance / field visit report
+            </label>
+            <div class="form-actions">
+              <button type="button" id="cancelPlanBtn" class="subtle-btn">Cancel</button>
+              <button type="submit" class="primary-btn">Save Itinerary</button>
+            </div>
+          </form>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Staff</th>
+                  <th>Date</th>
+                  <th>Program</th>
+                  <th>Work Type</th>
+                  <th>Task</th>
+                  <th>Place</th>
+                  <th>Clients</th>
+                  <th>Report Grade Applies</th>
+                  <th>Accomplishment Status</th>
+                  <th class="actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="planRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="accomplishmentView" class="view">
+        <section class="task-panel" aria-label="Accomplishment encoder">
+          <div class="section-heading">
+            <h2>Accomplishment Based on Itinerary</h2>
+            <button id="addBossTaskBtn" class="primary-btn" type="button">Add Boss-Instructed Task</button>
+          </div>
+
+          <form id="accomplishmentForm" class="entry-form hidden">
+            <input type="hidden" id="accomplishmentPlanId" />
+            <div class="field">
+              <label for="accomplishmentStaff">Staff</label>
+              <select id="accomplishmentStaff" required></select>
+            </div>
+            <div class="field">
+              <label for="accomplishmentDate">Date Conducted</label>
+              <input id="accomplishmentDate" type="date" required />
+            </div>
+            <div class="field">
+              <label for="accomplishmentType">Result</label>
+              <select id="accomplishmentType" required>
+                <option value="Conducted">Planned task conducted</option>
+                <option value="Not Conducted - Justified">Not conducted with justification</option>
+                <option value="Boss Instruction">Changed by instruction of the Boss</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="accomplishmentPercent">Performance</label>
+              <input id="accomplishmentPercent" type="number" min="0" max="100" step="5" value="100" required />
+            </div>
+            <div class="field">
+              <label for="accomplishmentWorkType">Work Type</label>
+              <select id="accomplishmentWorkType" required>
+                <option>Regular Work</option>
+                <option>Planning</option>
+                <option>Mapping</option>
+                <option>System Maintenance</option>
+                <option>System Creation</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Adjusted Score</label>
+              <div id="adjustedScorePreview" class="grade-preview">100%</div>
+            </div>
+            <div class="field wide">
+              <label for="accomplishmentOutput">Actual Output / Newly Instructed Task</label>
+              <textarea id="accomplishmentOutput" rows="2" required></textarea>
+            </div>
+            <div class="field wide">
+              <label for="accomplishmentJustification">Justification / Boss Instruction Details</label>
+              <textarea id="accomplishmentJustification" rows="2"></textarea>
+            </div>
+            <label class="setting-check full">
+              <input id="accomplishmentTechnicalAssistance" type="checkbox" />
+              Grade this report using the technical-assistance recommendation checklist
+            </label>
+            <div class="field full ta-evidence">
+              <label for="taPhotoInput">Technical Assistance Photo and Location</label>
+              <div class="location-actions">
+                <input id="taPhotoInput" type="file" accept="image/*" capture="environment" />
+                <button id="captureLocationBtn" class="subtle-btn" type="button">Use Current Location</button>
+              </div>
+              <div id="locationStatus" class="staff-meta">No location captured yet.</div>
+              <img id="taPhotoPreview" class="photo-preview hidden" alt="Technical assistance evidence preview" />
+            </div>
+            <div class="field full">
+              <label for="reportDetails">Technical / Operational Report Details</label>
+              <textarea id="reportDetails" rows="4" placeholder="Include analytical details from the reporting guide when applicable: inputs used, practices observed, crop condition, pests, yield, constraints, assistance needed, recommendations, and follow-up."></textarea>
+            </div>
+            <div class="field">
+              <label for="cropStage">Crop Stage</label>
+              <select id="cropStage">
+                <option value="Not crop-specific">Not crop-specific</option>
+                <option>Land preparation</option>
+                <option>Seedbed</option>
+                <option>Newly planted</option>
+                <option>Vegetative</option>
+                <option>Reproductive</option>
+                <option>Maturity</option>
+                <option>Harvesting</option>
+                <option>Marketing</option>
+              </select>
+            </div>
+            <div class="report-checklist auto-checklist full">
+              <div class="auto-checklist-heading">System-detected reporting checklist for selected stage</div>
+              <div id="autoChecklistPreview" class="auto-checklist-grid"></div>
+            </div>
+            <div class="field full">
+              <label>Automatic TA Report Grade</label>
+              <div id="reportGradePreview" class="grade-preview">N/A</div>
+            </div>
+            <div class="form-actions">
+              <button type="button" id="cancelAccomplishmentBtn" class="subtle-btn">Cancel</button>
+              <button type="submit" class="primary-btn">Save Accomplishment</button>
+            </div>
+          </form>
+
+          <details class="reference-panel" open>
+            <summary>Staff Reporting Reference</summary>
+            <div class="reference-grid">
+              <p>Reports should be informative and analytical, with current dates and a clear period covered.</p>
+              <p>For farm or field visits, include the details applicable to the current crop stage: land preparation, seedbed, newly planted, vegetative, reproductive, maturity, harvesting, or marketing.</p>
+              <p>The checklist grade applies only to technical assistance or field visit reports. The system grades only the checklist items appropriate to the selected stage and detects the score from the written accomplishment and field evidence.</p>
+            </div>
+          </details>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Staff</th>
+                  <th>Planned Date</th>
+                  <th>Planned Task</th>
+                  <th>Place</th>
+                  <th>Program</th>
+                  <th>Accomplishment</th>
+                  <th>Report Reference</th>
+                  <th>TA Report Grade</th>
+                  <th>Rating Effect</th>
+                  <th class="actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="accomplishmentRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="dashboardView" class="view">
+        <section class="workspace">
+          <aside class="staff-panel" aria-label="Staff efficiency">
+            <div class="section-heading">
+              <h2>Staff Efficiency</h2>
+              <button id="resetBtn" class="subtle-btn" type="button">Reset Samples</button>
+            </div>
+            <div id="staffList" class="staff-list"></div>
+          </aside>
+
+          <section class="task-panel" aria-label="Admin computations">
+            <div class="section-heading">
+              <h2>Admin Computations</h2>
+            </div>
+            <div class="dashboard-grid">
+              <article class="insight">
+                <span>Planned but Not Conducted</span>
+                <strong id="notConductedCount">0</strong>
+                <p>Rated against staff when there is no boss instruction.</p>
+              </article>
+              <article class="insight">
+                <span>Boss-Instructed Changes</span>
+                <strong id="bossInstructionCount">0</strong>
+                <p>Excluded from planned-task penalty and rated as new work.</p>
+              </article>
+              <article class="insight">
+                <span>Average Boss Task Rating</span>
+                <strong id="bossTaskRating">0%</strong>
+                <p>Performance score for newly instructed tasks.</p>
+              </article>
+              <article class="insight">
+                <span>Average TA Report Grade</span>
+                <strong id="averageReportGrade">0%</strong>
+                <p>Only technical-assistance reports are included.</p>
+              </article>
+              <article class="insight">
+                <span>Plus Factor Earned</span>
+                <strong id="totalPlusFactor">0</strong>
+                <p>Planning, mapping, and system work additions.</p>
+              </article>
+              <article class="insight">
+                <span>Average Adjusted Score</span>
+                <strong id="averageAdjustedScore">0%</strong>
+                <p>Performance rating after approved plus factors.</p>
+              </article>
+            </div>
+
+            <section class="chart-card" aria-label="Staff comparative performance graph">
+              <div class="section-heading">
+                <h2>Staff Performance Comparison</h2>
+              </div>
+              <div id="performanceChart" class="performance-chart"></div>
+            </section>
+
+            <section class="chart-card" aria-label="Technical assistance consolidated map">
+              <div class="section-heading">
+                <h2>Technical Assistance Field Map</h2>
+              </div>
+              <div id="fieldMap" class="field-map"></div>
+            </section>
+
+            <div class="table-wrap compact-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Staff</th>
+                    <th>Rated Planned</th>
+                    <th>Conducted</th>
+                    <th>Justified Not Conducted</th>
+                    <th>Boss Changes</th>
+                    <th>Efficiency</th>
+                    <th>Boss Task Rating</th>
+                    <th>TA Report Grade</th>
+                    <th>Plus Factor</th>
+                    <th>Adjusted Score</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboardRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <section class="print-signatories" aria-label="Report signatories">
+        <article class="signature-card">
+          <span>Prepared by</span>
+          <strong id="preparedByPrint">Staff / Encoder</strong>
+          <em id="preparedByTitlePrint">Agricultural Technologist/AEW</em>
+        </article>
+        <article class="signature-card">
+          <span>Reviewed by</span>
+          <strong id="reviewedByPrint">RODEL L. POMPA</strong>
+          <em id="reviewedByTitlePrint">Senior Agriculturist</em>
+        </article>
+        <article class="signature-card">
+          <span>Approved by</span>
+          <strong id="approvedByPrint">DANNY S. VILLACRUSIS</strong>
+          <em id="approvedByTitlePrint">Municipal Agriculturist</em>
+        </article>
+      </section>
+    </main>
+
+    <template id="emptyPlanTemplate">
+      <tr>
+        <td colspan="10" class="empty-state">No itinerary records match the current filters.</td>
+      </tr>
+    </template>
+
+    <div id="adminModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+      <section class="modal-panel">
+        <div class="section-heading">
+          <h2 id="adminTitle">Admin Settings</h2>
+          <button id="closeAdminBtn" class="subtle-btn" type="button">Close</button>
+        </div>
+        <form id="adminForm">
+          <section class="account-manager" aria-label="Staff account manager">
+            <div class="section-heading">
+              <h3>Staff Accounts</h3>
+            </div>
+            <div class="add-staff-grid">
+              <div class="field">
+                <label for="newStaffNameInput">Staff Name</label>
+                <input id="newStaffNameInput" type="text" placeholder="Full name" />
+              </div>
+              <div class="field">
+                <label for="newStaffPasswordInput">Password</label>
+                <input id="newStaffPasswordInput" type="text" placeholder="Password" />
+              </div>
+              <button id="addStaffAccountBtn" class="primary-btn" type="button">Add Staff</button>
+            </div>
+            <div id="staffAccountList" class="account-list"></div>
+          </section>
+          <div class="field raw-account-field">
+            <label for="staffNamesInput">Staff Accounts</label>
+            <textarea id="staffNamesInput" rows="12" required placeholder="Example: RODEL L. POMPA | rodel123"></textarea>
+          </div>
+          <div class="settings-grid">
+            <div class="field">
+              <label for="staffPasswordInput">Default Staff Password</label>
+              <input id="staffPasswordInput" type="text" />
+            </div>
+            <div class="field">
+              <label for="viewerPasswordInput">Viewer Password</label>
+              <input id="viewerPasswordInput" type="text" />
+            </div>
+            <div class="field">
+              <label for="adminPasswordInput">Admin Password</label>
+              <input id="adminPasswordInput" type="text" />
+            </div>
+            <label class="setting-check"><input id="staffCanPlanInput" type="checkbox" /> Staff can create/edit itinerary</label>
+            <label class="setting-check"><input id="staffCanAccomplishInput" type="checkbox" /> Staff can encode accomplishments</label>
+            <label class="setting-check"><input id="staffCanBossTaskInput" type="checkbox" /> Staff can add boss-instructed task</label>
+            <div class="field">
+              <label for="preparedByInput">Prepared By</label>
+              <input id="preparedByInput" type="text" />
+            </div>
+            <div class="field">
+              <label for="preparedByTitleInput">Prepared By Title</label>
+              <input id="preparedByTitleInput" type="text" />
+            </div>
+            <div class="field">
+              <label for="reviewedByInput">Reviewed By</label>
+              <input id="reviewedByInput" type="text" />
+            </div>
+            <div class="field">
+              <label for="reviewedByTitleInput">Reviewed By Title</label>
+              <input id="reviewedByTitleInput" type="text" />
+            </div>
+            <div class="field">
+              <label for="approvedByInput">Boss / Approved By</label>
+              <input id="approvedByInput" type="text" />
+            </div>
+            <div class="field">
+              <label for="approvedByTitleInput">Boss Title</label>
+              <input id="approvedByTitleInput" type="text" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="restoreStaffBtn" class="subtle-btn">Restore Default Staff</button>
+            <button type="submit" class="primary-btn">Save Settings</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

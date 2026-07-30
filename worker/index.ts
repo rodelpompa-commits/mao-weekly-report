@@ -29,6 +29,10 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+
     if (url.pathname === "/api/weekly-state") {
       return handleWeeklyState(request, env);
     }
@@ -319,8 +323,18 @@ function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
+      ...corsHeaders(),
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
     },
   });
+}
+
+function corsHeaders(): HeadersInit {
+  return {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "authorization, content-type",
+    "access-control-max-age": "86400",
+  };
 }

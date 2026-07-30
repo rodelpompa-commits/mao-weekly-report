@@ -1,0 +1,20 @@
+{
+  "name": "MAO Weekly Report",
+  "short_name": "MAO Report",
+  "description": "Weekly itinerary and accomplishment reporting for MAO staff.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#1267b1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icons/mao-weekly-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"]
+}
