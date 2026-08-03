@@ -1115,6 +1115,15 @@ function updatePlanTechnicalAssistanceIndicator() {
   els.planTechnicalAssistance.checked = technicalAssistanceApplies(tempPlan);
 }
 
+function lockTechnicalAssistanceControls() {
+  [els.planTechnicalAssistance, els.accomplishmentTechnicalAssistance].forEach((input) => {
+    if (!input) return;
+    input.disabled = true;
+    input.setAttribute('aria-disabled', 'true');
+    input.setAttribute('tabindex', '-1');
+  });
+}
+
 function syncAccomplishmentStatusControls() {
   const nonRated = nonRatedAccomplishmentTypes.includes(els.accomplishmentType.value);
   if (nonRated) {
@@ -1123,7 +1132,7 @@ function syncAccomplishmentStatusControls() {
   }
   els.accomplishmentPercent.disabled = nonRated;
   els.accomplishmentWorkType.disabled = nonRated;
-  els.accomplishmentTechnicalAssistance.disabled = true;
+  lockTechnicalAssistanceControls();
   updateReportGradePreview();
   updateAdjustedScorePreview();
 }
@@ -1255,6 +1264,7 @@ function applyAccessRules() {
 
 function renderAll() {
   applyAccessRules();
+  lockTechnicalAssistanceControls();
   renderSignatories();
   renderMetrics();
   renderPlanRows();
@@ -1292,7 +1302,7 @@ function showPlanForm(plan = null) {
     if (isStaff()) els.planStaff.value = state.session.staffName;
     updatePlanTechnicalAssistanceIndicator();
   }
-  els.planTechnicalAssistance.disabled = true;
+  lockTechnicalAssistanceControls();
   els.planStaff.disabled = isStaff() && !isAdmin();
   els.planTask.focus();
 }
@@ -1361,7 +1371,7 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentOutput.value = target.accomplishmentOutput || target.task || '';
   els.accomplishmentJustification.value = target.justification || '';
   els.accomplishmentTechnicalAssistance.checked = technicalAssistanceApplies(target);
-  els.accomplishmentTechnicalAssistance.disabled = true;
+  lockTechnicalAssistanceControls();
   els.cropStage.value = target.cropStage || 'Not crop-specific';
   els.reportDetails.value = target.reportDetails || '';
   setLocationStatus(target.taLatitude || '', target.taLongitude || '', target.taLocationCapturedAt || '');
@@ -1384,7 +1394,7 @@ function hideAccomplishmentForm() {
   els.accomplishmentStaff.disabled = false;
   els.accomplishmentPercent.disabled = false;
   els.accomplishmentWorkType.disabled = false;
-  els.accomplishmentTechnicalAssistance.disabled = true;
+  lockTechnicalAssistanceControls();
   setLocationStatus('', '', '');
   setPhotoPreview('');
   updateReportGradePreview();
@@ -1695,6 +1705,14 @@ function bindEvents() {
   document.querySelector('#addPlanBtn').addEventListener('click', () => showPlanForm());
   document.querySelector('#cancelPlanBtn').addEventListener('click', hidePlanForm);
   els.planForm.addEventListener('submit', savePlan);
+  [els.planTechnicalAssistance, els.accomplishmentTechnicalAssistance].forEach((input) => {
+    input.addEventListener('click', (event) => {
+      event.preventDefault();
+      lockTechnicalAssistanceControls();
+      updatePlanTechnicalAssistanceIndicator();
+      updateReportGradePreview();
+    });
+  });
   [els.planStaff, els.planDate, els.planProgram, els.planPlace, els.planTask, els.planClients].forEach((input) => {
     input.addEventListener('input', updatePlanTechnicalAssistanceIndicator);
     input.addEventListener('change', updatePlanTechnicalAssistanceIndicator);
