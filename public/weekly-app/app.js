@@ -584,9 +584,10 @@ function loadPlans() {
   state.plans = stored ? JSON.parse(stored) : [];
 }
 
-function savePlans() {
+function savePlans(options = {}) {
   localStorage.setItem(storageKey, JSON.stringify(state.plans));
-  scheduleSharedStateSave();
+  if (options.replaceSharedPlans) replaceSharedPlansNow();
+  else scheduleSharedStateSave();
 }
 
 function sharedStatePayload() {
@@ -626,18 +627,20 @@ function persistSharedStateLocally() {
   localStorage.setItem(signatoryStorageKey, JSON.stringify(state.signatories));
 }
 
-async function pushSharedState() {
-  try {
-    const response = await fetch(sharedStateEndpoint, { cache: 'no-store', headers: authHeaders() });
-    if (response.ok) {
-      const remoteState = await response.json();
-      if (hasSharedStateData(remoteState)) {
-        state.plans = mergePlans(remoteState.plans, state.plans);
-        localStorage.setItem(storageKey, JSON.stringify(state.plans));
+async function pushSharedState(options = {}) {
+  if (!options.replaceSharedPlans) {
+    try {
+      const response = await fetch(sharedStateEndpoint, { cache: 'no-store', headers: authHeaders() });
+      if (response.ok) {
+        const remoteState = await response.json();
+        if (hasSharedStateData(remoteState)) {
+          state.plans = mergePlans(remoteState.plans, state.plans);
+          localStorage.setItem(storageKey, JSON.stringify(state.plans));
+        }
       }
+    } catch (error) {
+      console.warn('Shared merge failed before save', error);
     }
-  } catch (error) {
-    console.warn('Shared merge failed before save', error);
   }
 
   await fetch(sharedStateEndpoint, {
@@ -653,6 +656,12 @@ function scheduleSharedStateSave() {
   sharedSaveTimer = setTimeout(() => {
     pushSharedState().catch((error) => console.warn('Shared save failed', error));
   }, 500);
+}
+
+function replaceSharedPlansNow() {
+  if (!sharedStateReady || applyingSharedState || !state.session.token) return;
+  clearTimeout(sharedSaveTimer);
+  pushSharedState({ replaceSharedPlans: true }).catch((error) => console.warn('Shared replace failed', error));
 }
 
 async function initializeSharedState() {
@@ -1456,13 +1465,14 @@ function removeAccomplishment(plan) {
     delete plan.justification;
     delete plan.reportDetails;
     delete plan.reportItems;
+    delete plan.technicalAssistance;
     delete plan.cropStage;
     delete plan.taLatitude;
     delete plan.taLongitude;
     delete plan.taLocationCapturedAt;
     delete plan.taPhotoData;
   }
-  savePlans();
+  savePlans({ replaceSharedPlans: true });
   renderAll();
 }
 
@@ -1816,7 +1826,7 @@ function bindEvents() {
     }
     if (button.dataset.action === 'delete-plan' && plan && confirm('Delete this itinerary record?')) {
       state.plans = state.plans.filter((item) => item.id !== plan.id);
-      savePlans();
+      savePlans({ replaceSharedPlans: true });
       renderAll();
     }
     if (button.dataset.action === 'delete-accomplishment' && plan && isAdmin()) {
