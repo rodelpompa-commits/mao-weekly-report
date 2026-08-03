@@ -507,6 +507,11 @@ tbody tr:hover {
   color: var(--violet);
 }
 
+.status.excluded {
+  background: #e0f2fe;
+  color: #075985;
+}
+
 .status.pending {
   background: var(--soft-yellow);
   color: var(--warn);
