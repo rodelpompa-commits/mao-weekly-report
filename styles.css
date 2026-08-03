@@ -521,6 +521,7 @@ tbody tr:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 170px;
 }
 
 .row-actions button {
@@ -531,6 +532,12 @@ tbody tr:hover {
 .delete-btn {
   background: #fee4e2;
   color: var(--bad);
+}
+
+.delete-btn.danger-outline {
+  background: #fff;
+  border: 1px solid #fda29b;
+  color: #b42318;
 }
 
 .empty-state {

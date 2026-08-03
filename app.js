@@ -858,6 +858,9 @@ function renderAccomplishmentRows() {
     if (isAdmin() && plan.accomplishmentType) {
       accomplishmentActions.push(`<button class="delete-btn" type="button" data-action="delete-accomplishment" data-id="${plan.id}">Remove Accomplishment</button>`);
     }
+    if (isAdmin()) {
+      accomplishmentActions.push(`<button class="delete-btn danger-outline" type="button" data-action="delete-plan" data-id="${plan.id}">Delete Itinerary</button>`);
+    }
     row.innerHTML = `
       <td>${escapeHtml(plan.staffName)}</td>
       <td>${escapeHtml(plan.datePlanned)}</td>
@@ -1457,7 +1460,7 @@ function removeAccomplishment(plan) {
     if (!confirm('Delete this boss-instructed accomplishment entry?')) return;
     state.plans = state.plans.filter((item) => item.id !== plan.id);
   } else {
-    if (!confirm('Remove the encoded accomplishment for this itinerary? The planned itinerary will remain.')) return;
+    if (!confirm('Remove only the encoded accomplishment? The planned itinerary will stay in the itinerary list.')) return;
     delete plan.accomplishmentType;
     delete plan.accomplishmentDate;
     delete plan.accomplishmentPercent;
@@ -1824,7 +1827,7 @@ function bindEvents() {
       showView('accomplishmentView');
       showAccomplishmentForm(plan);
     }
-    if (button.dataset.action === 'delete-plan' && plan && confirm('Delete this itinerary record?')) {
+    if (button.dataset.action === 'delete-plan' && plan && confirm('Delete the whole itinerary record, including any encoded accomplishment for this item?')) {
       state.plans = state.plans.filter((item) => item.id !== plan.id);
       savePlans({ replaceSharedPlans: true });
       renderAll();
