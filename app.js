@@ -72,29 +72,65 @@ const cropTaReportRubric = [
   { label: 'Marketing information', stages: ['Marketing'], keywords: ['market', 'price', 'buyer', 'trader', 'selling', 'marketing', 'demand', 'farmgate'] }
 ];
 const livestockTaReportRubric = [
+  {
+    label: 'Date, place, and livestock client recorded',
+    detect: (plan, text) => Boolean((plan.accomplishmentDate || plan.datePlanned) && /\b(barangay|farm|backyard|site|client|raiser|owner|beneficiary|association)\b/.test(text))
+  },
+  {
+    label: 'Technical assistance evidence attached or described',
+    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(photo|location|field visit|farm visit|validated|inspected|assisted|advised|consultation)\b/.test(text))
+  },
+  { label: 'Livestock client concern or purpose stated', keywords: ['concern', 'request', 'purpose', 'client', 'raiser', 'owner', 'beneficiary', 'complaint', 'issue', 'mortality', 'sick', 'production'] },
   { label: 'Animal commodity identified', keywords: ['livestock', 'animal', 'cattle', 'carabao', 'swine', 'hog', 'pig', 'goat', 'poultry', 'chicken', 'duck', 'native chicken', 'layer', 'broiler'] },
   { label: 'Number of animals and production stage recorded', keywords: ['head', 'heads', 'herd', 'flock', 'breeder', 'grower', 'fattener', 'piglet', 'sow', 'boar', 'calf', 'kid', 'chick', 'laying', 'pregnant', 'lactating', 'production stage'] },
   { label: 'Health condition and disease signs assessed', keywords: ['health', 'condition', 'disease', 'sick', 'symptom', 'mortality', 'death', 'fever', 'diarrhea', 'wound', 'infection', 'parasite', 'respiratory', 'limping'] },
   { label: 'Feeds, water, housing, and sanitation checked', keywords: ['feed', 'feeding', 'nutrition', 'forage', 'water', 'housing', 'pen', 'shelter', 'waterer', 'sanitation', 'biosecurity', 'waste', 'cleaning', 'management'] },
   { label: 'Vaccination, treatment, or veterinary referral advised', keywords: ['vaccine', 'vaccination', 'treatment', 'deworm', 'medicine', 'antibiotic', 'vitamins', 'veterinary', 'vet', 'referral', 'quarantine', 'isolate', 'medication'] },
+  { label: 'Livestock constraints or risk factors noted', keywords: ['challenge', 'constraint', 'problem', 'issue', 'lack', 'shortage', 'delayed', 'damage', 'difficulty', 'risk', 'biosecurity', 'outbreak'] },
   { label: 'Livestock recommendation or follow-up action stated', keywords: ['recommend', 'recommendation', 'advised', 'follow-up', 'follow up', 'next visit', 'monitor', 'return visit', 'coordinate', 'action needed'] }
 ];
 const fisheryTaReportRubric = [
+  {
+    label: 'Date, place, and fishery client recorded',
+    detect: (plan, text) => Boolean((plan.accomplishmentDate || plan.datePlanned) && /\b(barangay|coastal|pond|river|lake|landing|site|client|fisherfolk|operator|beneficiary|association)\b/.test(text))
+  },
+  {
+    label: 'Technical assistance evidence attached or described',
+    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(photo|location|field visit|site visit|validated|inspected|assisted|advised|consultation)\b/.test(text))
+  },
+  { label: 'Fishery client concern or purpose stated', keywords: ['concern', 'request', 'purpose', 'client', 'fisherfolk', 'operator', 'beneficiary', 'complaint', 'issue', 'production', 'registration'] },
   { label: 'Fishery commodity or fishing activity identified', keywords: ['fish', 'fishery', 'tilapia', 'bangus', 'milkfish', 'shrimp', 'crab', 'aquaculture', 'capture', 'fishing', 'fisherfolk', 'seaweed', 'shellfish'] },
   { label: 'Culture system, gear, boat, or site described', keywords: ['pond', 'cage', 'pen', 'hatchery', 'coastal', 'river', 'lake', 'gear', 'net', 'hook', 'boat', 'banca', 'site', 'landing', 'culture system'] },
   { label: 'Water or habitat condition assessed', keywords: ['water', 'salinity', 'oxygen', 'dissolved oxygen', 'ph', 'turbidity', 'algae', 'temperature', 'habitat', 'siltation', 'pollution', 'water quality'] },
   { label: 'Stocking, feeding, or production practice checked', keywords: ['stocking', 'fingerling', 'fry', 'feed', 'feeding', 'sampling', 'growth', 'harvest', 'culture management', 'production practice', 'survival'] },
   { label: 'Fish health, losses, or regulatory concern noted', keywords: ['fish kill', 'disease', 'mortality', 'loss', 'damage', 'illegal', 'registration', 'license', 'permit', 'compliance', 'closed season', 'ordinance'] },
+  { label: 'Fishery constraints or risk factors noted', keywords: ['challenge', 'constraint', 'problem', 'issue', 'lack', 'shortage', 'delayed', 'damage', 'difficulty', 'risk', 'pollution', 'weather'] },
   { label: 'Fishery recommendation or follow-up action stated', keywords: ['recommend', 'recommendation', 'advised', 'follow-up', 'follow up', 'next visit', 'monitor', 'coordinate', 'action needed', 'referral'] }
 ];
 const biosystemsTaReportRubric = [
+  {
+    label: 'Date, site, and engineering client recorded',
+    detect: (plan, text) => Boolean((plan.accomplishmentDate || plan.datePlanned) && /\b(barangay|site|location|client|beneficiary|operator|contractor|association|recipient|project)\b/.test(text))
+  },
+  {
+    label: 'Technical assistance evidence attached or described',
+    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(photo|location|site visit|inspection|validated|tested|assisted|advised|consultation)\b/.test(text))
+  },
+  { label: 'Engineering concern or purpose stated', keywords: ['concern', 'request', 'purpose', 'client', 'beneficiary', 'operator', 'contractor', 'issue', 'inspection', 'validation', 'repair', 'maintenance'] },
   { label: 'Project, equipment, facility, or system identified', keywords: ['project', 'equipment', 'facility', 'machinery', 'machine', 'irrigation', 'greenhouse', 'dryer', 'post-harvest', 'structure', 'system', 'solar', 'pump', 'engine'] },
   { label: 'Site location, beneficiary, operator, or contractor recorded', keywords: ['site', 'location', 'beneficiary', 'operator', 'contractor', 'association', 'client', 'recipient', 'barangay', 'owner', 'cooperator'] },
   { label: 'Technical condition, progress, or operation assessed', keywords: ['condition', 'progress', 'operation', 'operational', 'functioning', 'inspection', 'validation', 'testing', 'commissioning', 'status', 'performance'] },
   { label: 'Defect, repair, maintenance, or safety issue noted', keywords: ['defect', 'damage', 'repair', 'maintenance', 'calibration', 'safety', 'hazard', 'leak', 'broken', 'malfunction', 'replacement', 'corrective'] },
   { label: 'Measurement, specification, design, or compliance checked', keywords: ['measurement', 'measure', 'specification', 'design', 'dimension', 'capacity', 'horsepower', 'flow rate', 'compliance', 'standard', 'plan', 'layout'] },
+  { label: 'Engineering constraints or implementation issue noted', keywords: ['challenge', 'constraint', 'problem', 'issue', 'lack', 'shortage', 'delayed', 'damage', 'difficulty', 'risk', 'access', 'materials'] },
   { label: 'Engineering recommendation or action required stated', keywords: ['engineering', 'recommend', 'recommendation', 'action', 'required', 'follow-up', 'follow up', 'correction', 'coordinate', 'technical advice', 'next step'] }
 ];
+const reportGuides = {
+  crop: 'For crop technical assistance, include the current crop stage, crop condition, field/site observation, inputs or practices observed, client concern, assistance given, constraints, recommendation, and follow-up.',
+  Livestock: 'For livestock technical assistance, include the animal commodity, number of animals, production stage, health signs or mortality concern, feeds/water/housing/sanitation observation, client concern, assistance given, constraints, recommendation, and follow-up.',
+  Fishery: 'For fishery technical assistance, include the commodity or fishing activity, culture system/gear/site, water or habitat condition, stocking/feeding/production practice, fish health/losses or regulatory concern, assistance given, constraints, recommendation, and follow-up.',
+  'Biosystems Engineering': 'For biosystems engineering technical assistance, include the project/equipment/facility, site and beneficiary/operator/contractor, technical condition or progress, defects/repair/safety issues, measurements/specifications/compliance, action required, and follow-up.'
+};
 const storageKey = 'weekly-itinerary-accomplishment-monitor-v1';
 const staffStorageKey = 'weekly-accomplishment-staff-v1';
 const signatoryStorageKey = 'weekly-accomplishment-signatories-v1';
@@ -196,6 +232,7 @@ const els = {
   captureLocationBtn: document.querySelector('#captureLocationBtn'),
   locationStatus: document.querySelector('#locationStatus'),
   taPhotoPreview: document.querySelector('#taPhotoPreview'),
+  reportDetailsGuide: document.querySelector('#reportDetailsGuide'),
   serviceCategoryLabel: document.querySelector('#serviceCategoryLabel'),
   cropStage: document.querySelector('#cropStage'),
   reportDetails: document.querySelector('#reportDetails'),
@@ -376,7 +413,7 @@ function applicableReportItems(plan) {
       : cropTaReportRubric.filter((item) => !item.stages || item.stages.includes(stage));
     return uniqueRubricItems([...sharedTaReportRubric, ...cropItems]);
   }
-  return uniqueRubricItems([...sharedTaReportRubric, ...programItems]);
+  return uniqueRubricItems(programItems);
 }
 
 function technicalAssistanceCategory(plan) {
@@ -1213,6 +1250,9 @@ function updateServiceCategoryOptions(program, selectedValue = '') {
     ? serviceCategoryOptions.crop
     : serviceCategoryOptions[program] || ['General technical assistance'];
   els.serviceCategoryLabel.textContent = cropProgram ? 'Crop Stage' : 'Service Category';
+  const reportGuide = cropProgram ? reportGuides.crop : reportGuides[program] || reportGuides.crop;
+  els.reportDetails.placeholder = reportGuide;
+  if (els.reportDetailsGuide) els.reportDetailsGuide.textContent = reportGuide;
   els.cropStage.innerHTML = '';
   options.forEach((option) => els.cropStage.add(new Option(option, option)));
   els.cropStage.value = options.includes(selectedValue) ? selectedValue : options[0];
