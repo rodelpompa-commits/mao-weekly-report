@@ -212,7 +212,7 @@
               <select id="accomplishmentType" required>
                 <option value="Conducted">Planned task conducted</option>
                 <option value="Not Conducted - Justified">Not conducted with justification</option>
-                <option value="Boss Instruction">Changed by instruction of the Boss</option>
+                <option value="Boss Instruction">Not conducted because Boss gave priority task</option>
                 <option value="Absent">Absent / on approved leave</option>
                 <option value="Leave">Leave</option>
                 <option value="Official Travel">Official travel / official business</option>
@@ -241,7 +241,7 @@
               <textarea id="accomplishmentOutput" rows="2" required></textarea>
             </div>
             <div class="field wide">
-              <label for="accomplishmentJustification">Justification / Boss Instruction Details</label>
+              <label for="accomplishmentJustification">Justification / Boss Priority Instruction Details</label>
               <textarea id="accomplishmentJustification" rows="2"></textarea>
             </div>
             <label class="setting-check full">
@@ -296,6 +296,7 @@
               <p>For crop-related visits, include the details applicable to the current stage: land preparation, seedbed, newly planted, vegetative, reproductive, maturity, harvesting, or marketing.</p>
               <p>Technical assistance can also be for livestock, HVCC/corn, fishery, and biosystems engineering. The system uses the program and report details to apply the appropriate checklist.</p>
               <p>Absent, leave, and official-travel days are recorded for monitoring but excluded from staff marking.</p>
+              <p>Use Boss Instruction only when the planned itinerary was not done because the Boss gave a priority task. In that case, the planned task is not graded and only the newly instructed task is rated.</p>
             </div>
           </details>
 
@@ -342,12 +343,12 @@
                 <p>Rated against staff when there is no boss instruction.</p>
               </article>
               <article class="insight">
-                <span>Boss-Instructed Changes</span>
+                <span>Boss Priority Changes</span>
                 <strong id="bossInstructionCount">0</strong>
                 <p>Excluded from planned-task penalty and rated as new work.</p>
               </article>
               <article class="insight">
-                <span>Average Boss Task Rating</span>
+                <span>Average Boss Priority Task Rating</span>
                 <strong id="bossTaskRating">0%</strong>
                 <p>Performance score for newly instructed tasks.</p>
               </article>

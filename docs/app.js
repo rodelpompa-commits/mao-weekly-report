@@ -726,7 +726,7 @@ function ratingStats(plans) {
 function statusLabel(plan) {
   if (!plan.accomplishmentType) return '<span class="status pending">No accomplishment yet</span>';
   if (plan.accomplishmentType === 'Conducted') return '<span class="status conducted">Conducted</span>';
-  if (plan.accomplishmentType === 'Boss Instruction') return '<span class="status boss">Boss instruction</span>';
+  if (plan.accomplishmentType === 'Boss Instruction') return '<span class="status boss">Boss priority task</span>';
   if (isNonRatedOfficialStatus(plan)) return `<span class="status excluded">${escapeHtml(plan.accomplishmentType)}</span>`;
   return '<span class="status justified">Not conducted</span>';
 }
@@ -735,7 +735,7 @@ function ratingEffect(plan) {
   if (!plan.accomplishmentType) return 'Pending encoding';
   if (plan.accomplishmentType === 'Conducted') return `Rated as conducted (${plan.accomplishmentPercent || 100}%), adjusted ${adjustedScoreText(plan)}`;
   if (plan.accomplishmentType === 'Boss Instruction') {
-    return `No penalty on planned task. New task adjusted ${adjustedScoreText(plan)}.`;
+    return `Planned task not graded due to Boss priority instruction. Replacement task rated ${adjustedScoreText(plan)}.`;
   }
   if (isNonRatedOfficialStatus(plan)) {
     return `${plan.accomplishmentType} is recorded but excluded from marking.`;
@@ -880,7 +880,7 @@ function renderDashboard() {
         <span class="staff-meta">${stats.conducted.length}/${stats.ratedPlanned.length} conducted</span>
       </div>
       <div class="bar" aria-label="${escapeHtml(name)} efficiency ${stats.efficiency}%"><span style="width: ${stats.efficiency}%"></span></div>
-      <div class="staff-meta">${stats.nonRatedOfficial.length} excluded day(s), ${stats.bossChanges.length} boss-instructed change(s), boss task rating ${stats.bossRating}%, report grade ${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}, adjusted score ${stats.averageAdjusted}%</div>
+      <div class="staff-meta">${stats.nonRatedOfficial.length} excluded day(s), ${stats.bossChanges.length} boss priority change(s), boss priority task rating ${stats.bossRating}%, report grade ${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}, adjusted score ${stats.averageAdjusted}%</div>
     `;
     els.staffList.append(item);
   });
