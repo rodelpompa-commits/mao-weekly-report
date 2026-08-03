@@ -66,22 +66,28 @@ const cropTaReportRubric = [
   { label: 'Marketing information', stages: ['Marketing'], keywords: ['market', 'price', 'buyer', 'trader', 'selling', 'marketing', 'demand', 'farmgate'] }
 ];
 const livestockTaReportRubric = [
-  { label: 'Animal species / number / production stage', keywords: ['livestock', 'animal', 'cattle', 'carabao', 'swine', 'hog', 'goat', 'poultry', 'chicken', 'duck', 'head', 'herd', 'flock', 'breeder', 'grower'] },
-  { label: 'Health condition / disease signs / mortality', keywords: ['health', 'disease', 'sick', 'symptom', 'mortality', 'death', 'fever', 'diarrhea', 'wound', 'infection', 'parasite'] },
-  { label: 'Feeds / nutrition / housing management', keywords: ['feed', 'feeding', 'nutrition', 'forage', 'housing', 'pen', 'shelter', 'waterer', 'sanitation', 'management'] },
-  { label: 'Vaccination / treatment / veterinary referral', keywords: ['vaccine', 'vaccination', 'treatment', 'deworm', 'medicine', 'antibiotic', 'veterinary', 'vet', 'referral'] }
+  { label: 'Animal commodity identified', keywords: ['livestock', 'animal', 'cattle', 'carabao', 'swine', 'hog', 'pig', 'goat', 'poultry', 'chicken', 'duck', 'native chicken', 'layer', 'broiler'] },
+  { label: 'Number of animals and production stage recorded', keywords: ['head', 'heads', 'herd', 'flock', 'breeder', 'grower', 'fattener', 'piglet', 'sow', 'boar', 'calf', 'kid', 'chick', 'laying', 'pregnant', 'lactating', 'production stage'] },
+  { label: 'Health condition and disease signs assessed', keywords: ['health', 'condition', 'disease', 'sick', 'symptom', 'mortality', 'death', 'fever', 'diarrhea', 'wound', 'infection', 'parasite', 'respiratory', 'limping'] },
+  { label: 'Feeds, water, housing, and sanitation checked', keywords: ['feed', 'feeding', 'nutrition', 'forage', 'water', 'housing', 'pen', 'shelter', 'waterer', 'sanitation', 'biosecurity', 'waste', 'cleaning', 'management'] },
+  { label: 'Vaccination, treatment, or veterinary referral advised', keywords: ['vaccine', 'vaccination', 'treatment', 'deworm', 'medicine', 'antibiotic', 'vitamins', 'veterinary', 'vet', 'referral', 'quarantine', 'isolate', 'medication'] },
+  { label: 'Livestock recommendation or follow-up action stated', keywords: ['recommend', 'recommendation', 'advised', 'follow-up', 'follow up', 'next visit', 'monitor', 'return visit', 'coordinate', 'action needed'] }
 ];
 const fisheryTaReportRubric = [
-  { label: 'Fishery commodity / culture or capture activity', keywords: ['fish', 'fishery', 'tilapia', 'bangus', 'shrimp', 'aquaculture', 'pond', 'cage', 'capture', 'fishing', 'fisherfolk'] },
-  { label: 'Water condition / pond or coastal site condition', keywords: ['water', 'pond', 'coastal', 'salinity', 'oxygen', 'ph', 'turbidity', 'algae', 'site condition', 'habitat'] },
-  { label: 'Stocking / feeding / gear or production practices', keywords: ['stocking', 'fingerling', 'feed', 'feeding', 'gear', 'net', 'boat', 'production practice', 'culture management'] },
-  { label: 'Fish health / losses / regulatory concern', keywords: ['fish kill', 'disease', 'mortality', 'loss', 'damage', 'illegal', 'registration', 'license', 'permit', 'compliance'] }
+  { label: 'Fishery commodity or fishing activity identified', keywords: ['fish', 'fishery', 'tilapia', 'bangus', 'milkfish', 'shrimp', 'crab', 'aquaculture', 'capture', 'fishing', 'fisherfolk', 'seaweed', 'shellfish'] },
+  { label: 'Culture system, gear, boat, or site described', keywords: ['pond', 'cage', 'pen', 'hatchery', 'coastal', 'river', 'lake', 'gear', 'net', 'hook', 'boat', 'banca', 'site', 'landing', 'culture system'] },
+  { label: 'Water or habitat condition assessed', keywords: ['water', 'salinity', 'oxygen', 'dissolved oxygen', 'ph', 'turbidity', 'algae', 'temperature', 'habitat', 'siltation', 'pollution', 'water quality'] },
+  { label: 'Stocking, feeding, or production practice checked', keywords: ['stocking', 'fingerling', 'fry', 'feed', 'feeding', 'sampling', 'growth', 'harvest', 'culture management', 'production practice', 'survival'] },
+  { label: 'Fish health, losses, or regulatory concern noted', keywords: ['fish kill', 'disease', 'mortality', 'loss', 'damage', 'illegal', 'registration', 'license', 'permit', 'compliance', 'closed season', 'ordinance'] },
+  { label: 'Fishery recommendation or follow-up action stated', keywords: ['recommend', 'recommendation', 'advised', 'follow-up', 'follow up', 'next visit', 'monitor', 'coordinate', 'action needed', 'referral'] }
 ];
 const biosystemsTaReportRubric = [
-  { label: 'Project / equipment / facility inspected', keywords: ['project', 'equipment', 'facility', 'machinery', 'irrigation', 'greenhouse', 'dryer', 'post-harvest', 'structure', 'system'] },
-  { label: 'Technical condition / progress / defect observed', keywords: ['condition', 'progress', 'defect', 'damage', 'repair', 'maintenance', 'calibration', 'inspection', 'validation', 'operation'] },
-  { label: 'Beneficiary / contractor / operator coordination', keywords: ['beneficiary', 'contractor', 'operator', 'coordination', 'turnover', 'training', 'orientation', 'client'] },
-  { label: 'Engineering recommendation / action required', keywords: ['engineering', 'recommend', 'action', 'required', 'design', 'specification', 'measurement', 'follow-up', 'correction'] }
+  { label: 'Project, equipment, facility, or system identified', keywords: ['project', 'equipment', 'facility', 'machinery', 'machine', 'irrigation', 'greenhouse', 'dryer', 'post-harvest', 'structure', 'system', 'solar', 'pump', 'engine'] },
+  { label: 'Site location, beneficiary, operator, or contractor recorded', keywords: ['site', 'location', 'beneficiary', 'operator', 'contractor', 'association', 'client', 'recipient', 'barangay', 'owner', 'cooperator'] },
+  { label: 'Technical condition, progress, or operation assessed', keywords: ['condition', 'progress', 'operation', 'operational', 'functioning', 'inspection', 'validation', 'testing', 'commissioning', 'status', 'performance'] },
+  { label: 'Defect, repair, maintenance, or safety issue noted', keywords: ['defect', 'damage', 'repair', 'maintenance', 'calibration', 'safety', 'hazard', 'leak', 'broken', 'malfunction', 'replacement', 'corrective'] },
+  { label: 'Measurement, specification, design, or compliance checked', keywords: ['measurement', 'measure', 'specification', 'design', 'dimension', 'capacity', 'horsepower', 'flow rate', 'compliance', 'standard', 'plan', 'layout'] },
+  { label: 'Engineering recommendation or action required stated', keywords: ['engineering', 'recommend', 'recommendation', 'action', 'required', 'follow-up', 'follow up', 'correction', 'coordinate', 'technical advice', 'next step'] }
 ];
 const storageKey = 'weekly-itinerary-accomplishment-monitor-v1';
 const staffStorageKey = 'weekly-accomplishment-staff-v1';
@@ -328,6 +334,7 @@ function technicalAssistanceApplies(plan) {
 }
 
 function cropStageFor(plan) {
+  if (!isCropProgram(plan.program)) return 'Not crop-specific';
   return allCropStages.includes(plan.cropStage) ? plan.cropStage : 'Not crop-specific';
 }
 
@@ -356,6 +363,15 @@ function applicableReportItems(plan) {
     return uniqueRubricItems([...sharedTaReportRubric, ...cropItems]);
   }
   return uniqueRubricItems([...sharedTaReportRubric, ...programItems]);
+}
+
+function technicalAssistanceCategory(plan) {
+  if (!technicalAssistanceApplies(plan)) return 'Not graded under technical-assistance checklist';
+  if (isCropProgram(plan.program)) return `Crop stage: ${cropStageFor(plan)}`;
+  if (plan.program === 'Livestock') return 'Livestock technical assistance';
+  if (plan.program === 'Fishery') return 'Fishery technical assistance';
+  if (plan.program === 'Biosystems Engineering') return 'Biosystems engineering technical assistance';
+  return 'Program technical assistance';
 }
 
 function detectedReportItems(plan) {
@@ -912,7 +928,7 @@ function renderAccomplishmentRows() {
       : '';
     const reportReference = [
       escapeHtml(plan.reportDetails || ''),
-      isTechnicalAssistance ? `<div class="staff-meta">Crop stage/category: ${escapeHtml(cropStageFor(plan))}</div>` : '',
+      isTechnicalAssistance ? `<div class="staff-meta">Checklist: ${escapeHtml(technicalAssistanceCategory(plan))}</div>` : '',
       isTechnicalAssistance && detectedReportItems(plan).length
         ? `<div class="staff-meta">System detected ${detectedReportItems(plan).length}/${applicableReportItems(plan).length}: ${escapeHtml(detectedReportItems(plan).join(', '))}</div>`
         : `<div class="staff-meta">${isTechnicalAssistance ? 'No checklist evidence detected yet' : 'Not graded under technical-assistance checklist'}</div>`
