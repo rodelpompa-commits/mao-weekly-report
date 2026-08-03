@@ -1076,12 +1076,12 @@ function updateReportGradePreview() {
     accomplishmentType: els.accomplishmentType.value,
     cropStage: els.cropStage.value,
     reportDetails: els.reportDetails.value,
-    technicalAssistance: els.accomplishmentTechnicalAssistance.checked,
+    technicalAssistance: false,
     taLatitude: els.locationStatus.dataset.lat || '',
     taLongitude: els.locationStatus.dataset.lng || '',
     taPhotoData: els.taPhotoPreview.dataset.photoData || ''
   };
-  els.accomplishmentTechnicalAssistance.checked = technicalAssistanceApplies(tempPlan);
+  setTechnicalAssistanceIndicator(els.accomplishmentTechnicalAssistance, technicalAssistanceApplies(tempPlan));
   const detected = detectedReportItems(tempPlan);
   const applicable = applicableReportItems(tempPlan);
   els.reportGradePreview.textContent = reportGradeText(tempPlan);
@@ -1112,27 +1112,24 @@ function updatePlanTechnicalAssistanceIndicator() {
     clients: els.planClients.value,
     datePlanned: els.planDate.value
   };
-  els.planTechnicalAssistance.checked = technicalAssistanceApplies(tempPlan);
+  setTechnicalAssistanceIndicator(els.planTechnicalAssistance, technicalAssistanceApplies(tempPlan));
 }
 
-function lockTechnicalAssistanceControls() {
-  [els.planTechnicalAssistance, els.accomplishmentTechnicalAssistance].forEach((input) => {
-    if (!input) return;
-    input.disabled = true;
-    input.setAttribute('aria-disabled', 'true');
-    input.setAttribute('tabindex', '-1');
-  });
+function setTechnicalAssistanceIndicator(element, detected) {
+  if (!element) return;
+  element.textContent = detected ? 'System detected: Yes' : 'System detected: No';
+  element.classList.toggle('detected', detected);
+  element.classList.toggle('not-detected', !detected);
 }
 
 function syncAccomplishmentStatusControls() {
   const nonRated = nonRatedAccomplishmentTypes.includes(els.accomplishmentType.value);
   if (nonRated) {
     els.accomplishmentPercent.value = 0;
-    els.accomplishmentTechnicalAssistance.checked = false;
+    setTechnicalAssistanceIndicator(els.accomplishmentTechnicalAssistance, false);
   }
   els.accomplishmentPercent.disabled = nonRated;
   els.accomplishmentWorkType.disabled = nonRated;
-  lockTechnicalAssistanceControls();
   updateReportGradePreview();
   updateAdjustedScorePreview();
 }
@@ -1264,7 +1261,6 @@ function applyAccessRules() {
 
 function renderAll() {
   applyAccessRules();
-  lockTechnicalAssistanceControls();
   renderSignatories();
   renderMetrics();
   renderPlanRows();
@@ -1293,7 +1289,7 @@ function showPlanForm(plan = null) {
     els.planPlace.value = plan.place;
     els.planTask.value = plan.task;
     els.planClients.value = plan.clients || '';
-    els.planTechnicalAssistance.checked = technicalAssistanceApplies(plan);
+    setTechnicalAssistanceIndicator(els.planTechnicalAssistance, technicalAssistanceApplies(plan));
   } else {
     els.planForm.reset();
     els.planId.value = '';
@@ -1302,7 +1298,6 @@ function showPlanForm(plan = null) {
     if (isStaff()) els.planStaff.value = state.session.staffName;
     updatePlanTechnicalAssistanceIndicator();
   }
-  lockTechnicalAssistanceControls();
   els.planStaff.disabled = isStaff() && !isAdmin();
   els.planTask.focus();
 }
@@ -1370,8 +1365,7 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentWorkType.value = target.workType || 'Regular Work';
   els.accomplishmentOutput.value = target.accomplishmentOutput || target.task || '';
   els.accomplishmentJustification.value = target.justification || '';
-  els.accomplishmentTechnicalAssistance.checked = technicalAssistanceApplies(target);
-  lockTechnicalAssistanceControls();
+  setTechnicalAssistanceIndicator(els.accomplishmentTechnicalAssistance, technicalAssistanceApplies(target));
   els.cropStage.value = target.cropStage || 'Not crop-specific';
   els.reportDetails.value = target.reportDetails || '';
   setLocationStatus(target.taLatitude || '', target.taLongitude || '', target.taLocationCapturedAt || '');
@@ -1394,7 +1388,6 @@ function hideAccomplishmentForm() {
   els.accomplishmentStaff.disabled = false;
   els.accomplishmentPercent.disabled = false;
   els.accomplishmentWorkType.disabled = false;
-  lockTechnicalAssistanceControls();
   setLocationStatus('', '', '');
   setPhotoPreview('');
   updateReportGradePreview();
@@ -1705,14 +1698,6 @@ function bindEvents() {
   document.querySelector('#addPlanBtn').addEventListener('click', () => showPlanForm());
   document.querySelector('#cancelPlanBtn').addEventListener('click', hidePlanForm);
   els.planForm.addEventListener('submit', savePlan);
-  [els.planTechnicalAssistance, els.accomplishmentTechnicalAssistance].forEach((input) => {
-    input.addEventListener('click', (event) => {
-      event.preventDefault();
-      lockTechnicalAssistanceControls();
-      updatePlanTechnicalAssistanceIndicator();
-      updateReportGradePreview();
-    });
-  });
   [els.planStaff, els.planDate, els.planProgram, els.planPlace, els.planTask, els.planClients].forEach((input) => {
     input.addEventListener('input', updatePlanTechnicalAssistanceIndicator);
     input.addEventListener('change', updatePlanTechnicalAssistanceIndicator);
@@ -1789,7 +1774,6 @@ function bindEvents() {
   els.accomplishmentJustification.addEventListener('input', updateReportGradePreview);
   els.accomplishmentStaff.addEventListener('change', updateReportGradePreview);
   els.accomplishmentDate.addEventListener('change', updateReportGradePreview);
-  els.accomplishmentTechnicalAssistance.addEventListener('change', updateReportGradePreview);
   els.cropStage.addEventListener('change', updateReportGradePreview);
   els.accomplishmentType.addEventListener('change', syncAccomplishmentStatusControls);
   els.accomplishmentPercent.addEventListener('input', updateAdjustedScorePreview);
