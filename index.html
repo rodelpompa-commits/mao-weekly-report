@@ -71,6 +71,7 @@
             <option value="All">All programs</option>
             <option>Rice</option>
             <option>HVCC</option>
+            <option>Corn</option>
             <option>Livestock</option>
             <option>Fishery</option>
             <option>Biosystems Engineering</option>
@@ -129,6 +130,7 @@
               <select id="planProgram" required>
                 <option>Rice</option>
                 <option>HVCC</option>
+                <option>Corn</option>
                 <option>Livestock</option>
                 <option>Fishery</option>
                 <option>Biosystems Engineering</option>
@@ -211,6 +213,9 @@
                 <option value="Conducted">Planned task conducted</option>
                 <option value="Not Conducted - Justified">Not conducted with justification</option>
                 <option value="Boss Instruction">Changed by instruction of the Boss</option>
+                <option value="Absent">Absent / on approved leave</option>
+                <option value="Leave">Leave</option>
+                <option value="Official Travel">Official travel / official business</option>
               </select>
             </div>
             <div class="field">
@@ -254,10 +259,10 @@
             </div>
             <div class="field full">
               <label for="reportDetails">Technical / Operational Report Details</label>
-              <textarea id="reportDetails" rows="4" placeholder="Include analytical details from the reporting guide when applicable: inputs used, practices observed, crop condition, pests, yield, constraints, assistance needed, recommendations, and follow-up."></textarea>
+              <textarea id="reportDetails" rows="4" placeholder="Include analytical details when applicable: crop or commodity condition, livestock/fishery/biosystems observations, inputs or practices observed, client concern, assistance given, constraints, recommendations, and follow-up."></textarea>
             </div>
             <div class="field">
-              <label for="cropStage">Crop Stage</label>
+              <label for="cropStage">Crop Stage / Service Category</label>
               <select id="cropStage">
                 <option value="Not crop-specific">Not crop-specific</option>
                 <option>Land preparation</option>
@@ -288,8 +293,9 @@
             <summary>Staff Reporting Reference</summary>
             <div class="reference-grid">
               <p>Reports should be informative and analytical, with current dates and a clear period covered.</p>
-              <p>For farm or field visits, include the details applicable to the current crop stage: land preparation, seedbed, newly planted, vegetative, reproductive, maturity, harvesting, or marketing.</p>
-              <p>The checklist grade applies only to technical assistance or field visit reports. The system grades only the checklist items appropriate to the selected stage and detects the score from the written accomplishment and field evidence.</p>
+              <p>For crop-related visits, include the details applicable to the current stage: land preparation, seedbed, newly planted, vegetative, reproductive, maturity, harvesting, or marketing.</p>
+              <p>Technical assistance can also be for livestock, HVCC/corn, fishery, and biosystems engineering. The system uses the program and report details to apply the appropriate checklist.</p>
+              <p>Absent, leave, and official-travel days are recorded for monitoring but excluded from staff marking.</p>
             </div>
           </details>
 
@@ -385,6 +391,7 @@
                     <th>Conducted</th>
                     <th>Justified Not Conducted</th>
                     <th>Boss Changes</th>
+                    <th>Excluded Days</th>
                     <th>Efficiency</th>
                     <th>Boss Task Rating</th>
                     <th>TA Report Grade</th>

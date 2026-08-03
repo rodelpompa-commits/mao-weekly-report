@@ -27,7 +27,7 @@ const officialStaffAccounts = [
 ];
 const defaultStaff = officialStaffAccounts.map((account) => account.name);
 
-const programs = ['Rice', 'HVCC', 'Livestock', 'Fishery', 'Biosystems Engineering'];
+const programs = ['Rice', 'HVCC', 'Corn', 'Livestock', 'Fishery', 'Biosystems Engineering'];
 const plusFactors = {
   'Regular Work': 0,
   Planning: 5,
@@ -36,12 +36,23 @@ const plusFactors = {
   'System Creation': 10
 };
 const allCropStages = ['Land preparation', 'Seedbed', 'Newly planted', 'Vegetative', 'Reproductive', 'Maturity', 'Harvesting', 'Marketing'];
-const taReportRubric = [
+const nonRatedAccomplishmentTypes = ['Absent', 'Leave', 'Official Travel'];
+const sharedTaReportRubric = [
   {
     label: 'Dates checked and current period covered',
     stages: allCropStages,
     detect: (plan, text) => Boolean(plan.accomplishmentDate || plan.datePlanned || plan.weekStart || /\b(date|week|period|covered|conducted)\b/.test(text))
   },
+  {
+    label: 'Technical assistance evidence',
+    stages: allCropStages,
+    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(technical assistance|assisted|advised|consultation|field visit|validated|inspection|training)\b/.test(text))
+  },
+  { label: 'Client concern / purpose of assistance', stages: allCropStages, keywords: ['concern', 'request', 'purpose', 'client', 'farmer', 'raiser', 'fisherfolk', 'beneficiary', 'complaint', 'issue'] },
+  { label: 'Challenges / constraints encountered', stages: allCropStages, keywords: ['challenge', 'constraint', 'problem', 'issue', 'concern', 'lack', 'shortage', 'delayed', 'damage', 'difficulty'] },
+  { label: 'Recommendations / interventions / follow-up', stages: allCropStages, keywords: ['recommend', 'recommendation', 'intervention', 'follow-up', 'follow up', 'advised', 'next step', 'action needed', 'solution'] }
+];
+const cropTaReportRubric = [
   { label: 'Fertilizers / pesticides used', stages: ['Vegetative', 'Reproductive'], keywords: ['fertilizer', 'fertiliser', 'urea', 'complete', '14-14-14', '16-20-0', 'pesticide', 'insecticide', 'herbicide', 'fungicide', 'chemical', 'spray'] },
   { label: 'Farming practices / strategies', stages: ['Land preparation', 'Seedbed', 'Newly planted', 'Vegetative'], keywords: ['practice', 'strategy', 'method', 'planting', 'spacing', 'transplant', 'direct seeding', 'land preparation', 'cultural management', 'farm management'] },
   { label: 'Crop variety / seed type and source', stages: ['Seedbed', 'Newly planted'], keywords: ['variety', 'seed', 'hybrid', 'inbred', 'certified seed', 'seed source', 'seedling', 'breed', 'stock'] },
@@ -50,16 +61,27 @@ const taReportRubric = [
   { label: 'Pest and disease incidence / control', stages: ['Seedbed', 'Newly planted', 'Vegetative', 'Reproductive', 'Maturity'], keywords: ['pest', 'disease', 'insect', 'rat', 'bug', 'armyworm', 'stemborer', 'blast', 'bacterial', 'control', 'infestation', 'damage'] },
   { label: 'Current crop condition / stage of growth', stages: ['Seedbed', 'Newly planted', 'Vegetative', 'Reproductive', 'Maturity'], keywords: ['crop condition', 'condition', 'vegetative', 'flowering', 'tillering', 'booting', 'maturity', 'growth stage', 'healthy', 'stunted'] },
   { label: 'Estimated yield / comparison', stages: ['Reproductive', 'Maturity', 'Harvesting'], keywords: ['yield', 'estimated production', 'production', 'harvest estimate', 'bags', 'tons', 'cavans', 'comparison', 'compared'] },
-  { label: 'Challenges / constraints encountered', stages: allCropStages, keywords: ['challenge', 'constraint', 'problem', 'issue', 'concern', 'lack', 'shortage', 'delayed', 'damage', 'difficulty'] },
   { label: 'Innovative or best practices observed', stages: ['Vegetative', 'Reproductive', 'Maturity'], keywords: ['innovation', 'innovative', 'best practice', 'good practice', 'improved', 'technology', 'demo', 'adapted'] },
   { label: 'Harvesting / post-harvest practices', stages: ['Maturity', 'Harvesting'], keywords: ['harvest', 'post-harvest', 'post harvest', 'drying', 'milling', 'storage', 'threshing', 'processing'] },
-  { label: 'Marketing information', stages: ['Marketing'], keywords: ['market', 'price', 'buyer', 'trader', 'selling', 'marketing', 'demand', 'farmgate'] },
-  {
-    label: 'Technical assistance evidence',
-    stages: allCropStages,
-    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(technical assistance|assisted|advised|consultation|field visit|validated|inspection|training)\b/.test(text))
-  },
-  { label: 'Recommendations / interventions / follow-up', stages: allCropStages, keywords: ['recommend', 'recommendation', 'intervention', 'follow-up', 'follow up', 'advised', 'next step', 'action needed', 'solution'] }
+  { label: 'Marketing information', stages: ['Marketing'], keywords: ['market', 'price', 'buyer', 'trader', 'selling', 'marketing', 'demand', 'farmgate'] }
+];
+const livestockTaReportRubric = [
+  { label: 'Animal species / number / production stage', keywords: ['livestock', 'animal', 'cattle', 'carabao', 'swine', 'hog', 'goat', 'poultry', 'chicken', 'duck', 'head', 'herd', 'flock', 'breeder', 'grower'] },
+  { label: 'Health condition / disease signs / mortality', keywords: ['health', 'disease', 'sick', 'symptom', 'mortality', 'death', 'fever', 'diarrhea', 'wound', 'infection', 'parasite'] },
+  { label: 'Feeds / nutrition / housing management', keywords: ['feed', 'feeding', 'nutrition', 'forage', 'housing', 'pen', 'shelter', 'waterer', 'sanitation', 'management'] },
+  { label: 'Vaccination / treatment / veterinary referral', keywords: ['vaccine', 'vaccination', 'treatment', 'deworm', 'medicine', 'antibiotic', 'veterinary', 'vet', 'referral'] }
+];
+const fisheryTaReportRubric = [
+  { label: 'Fishery commodity / culture or capture activity', keywords: ['fish', 'fishery', 'tilapia', 'bangus', 'shrimp', 'aquaculture', 'pond', 'cage', 'capture', 'fishing', 'fisherfolk'] },
+  { label: 'Water condition / pond or coastal site condition', keywords: ['water', 'pond', 'coastal', 'salinity', 'oxygen', 'ph', 'turbidity', 'algae', 'site condition', 'habitat'] },
+  { label: 'Stocking / feeding / gear or production practices', keywords: ['stocking', 'fingerling', 'feed', 'feeding', 'gear', 'net', 'boat', 'production practice', 'culture management'] },
+  { label: 'Fish health / losses / regulatory concern', keywords: ['fish kill', 'disease', 'mortality', 'loss', 'damage', 'illegal', 'registration', 'license', 'permit', 'compliance'] }
+];
+const biosystemsTaReportRubric = [
+  { label: 'Project / equipment / facility inspected', keywords: ['project', 'equipment', 'facility', 'machinery', 'irrigation', 'greenhouse', 'dryer', 'post-harvest', 'structure', 'system'] },
+  { label: 'Technical condition / progress / defect observed', keywords: ['condition', 'progress', 'defect', 'damage', 'repair', 'maintenance', 'calibration', 'inspection', 'validation', 'operation'] },
+  { label: 'Beneficiary / contractor / operator coordination', keywords: ['beneficiary', 'contractor', 'operator', 'coordination', 'turnover', 'training', 'orientation', 'client'] },
+  { label: 'Engineering recommendation / action required', keywords: ['engineering', 'recommend', 'action', 'required', 'design', 'specification', 'measurement', 'follow-up', 'correction'] }
 ];
 const storageKey = 'weekly-itinerary-accomplishment-monitor-v1';
 const staffStorageKey = 'weekly-accomplishment-staff-v1';
@@ -291,10 +313,31 @@ function cropStageFor(plan) {
   return allCropStages.includes(plan.cropStage) ? plan.cropStage : 'Not crop-specific';
 }
 
+function isCropProgram(program = '') {
+  return ['Rice', 'HVCC', 'Corn'].includes(program);
+}
+
+function uniqueRubricItems(items) {
+  const byLabel = new Map();
+  items.forEach((item) => {
+    if (!byLabel.has(item.label)) byLabel.set(item.label, item);
+  });
+  return [...byLabel.values()];
+}
+
 function applicableReportItems(plan) {
   const stage = cropStageFor(plan);
-  if (stage === 'Not crop-specific') return taReportRubric;
-  return taReportRubric.filter((item) => item.stages.includes(stage));
+  let programItems = cropTaReportRubric;
+  if (plan.program === 'Livestock') programItems = livestockTaReportRubric;
+  if (plan.program === 'Fishery') programItems = fisheryTaReportRubric;
+  if (plan.program === 'Biosystems Engineering') programItems = biosystemsTaReportRubric;
+  if (isCropProgram(plan.program)) {
+    const cropItems = stage === 'Not crop-specific'
+      ? cropTaReportRubric
+      : cropTaReportRubric.filter((item) => !item.stages || item.stages.includes(stage));
+    return uniqueRubricItems([...sharedTaReportRubric, ...cropItems]);
+  }
+  return uniqueRubricItems([...sharedTaReportRubric, ...programItems]);
 }
 
 function detectedReportItems(plan) {
@@ -311,7 +354,7 @@ function detectedReportItems(plan) {
 function reportGrade(plan) {
   if (!plan.technicalAssistance) return null;
   const checkedItems = detectedReportItems(plan).length;
-  const applicableItems = applicableReportItems(plan).length || taReportRubric.length;
+  const applicableItems = applicableReportItems(plan).length || sharedTaReportRubric.length;
   return Math.round((checkedItems / applicableItems) * 100);
 }
 
@@ -334,19 +377,24 @@ function plusFactorFor(plan) {
 }
 
 function earnedPlusFactor(plan) {
-  if (!plan.accomplishmentType || plan.accomplishmentType === 'Not Conducted - Justified') return 0;
+  if (!plan.accomplishmentType || plan.accomplishmentType === 'Not Conducted - Justified' || isNonRatedOfficialStatus(plan)) return 0;
   return plusFactorFor(plan);
 }
 
 function adjustedScore(plan) {
-  if (!plan.accomplishmentType || plan.accomplishmentType === 'Not Conducted - Justified') return 0;
+  if (!plan.accomplishmentType || plan.accomplishmentType === 'Not Conducted - Justified' || isNonRatedOfficialStatus(plan)) return 0;
   const base = Number(plan.accomplishmentPercent || 0);
   return Math.min(100, base + earnedPlusFactor(plan));
 }
 
 function adjustedScoreText(plan) {
   if (!plan.accomplishmentType) return 'Pending';
+  if (isNonRatedOfficialStatus(plan)) return 'Excluded from rating';
   return `${adjustedScore(plan)}% (+${earnedPlusFactor(plan)})`;
+}
+
+function isNonRatedOfficialStatus(plan) {
+  return nonRatedAccomplishmentTypes.includes(plan.accomplishmentType);
 }
 
 function createId(index = 0) {
@@ -653,7 +701,8 @@ function filteredPlans() {
 }
 
 function ratingStats(plans) {
-  const ratedPlanned = plans.filter((plan) => plan.accomplishmentType !== 'Boss Instruction');
+  const nonRatedOfficial = plans.filter(isNonRatedOfficialStatus);
+  const ratedPlanned = plans.filter((plan) => plan.accomplishmentType !== 'Boss Instruction' && !isNonRatedOfficialStatus(plan));
   const conducted = ratedPlanned.filter((plan) => plan.accomplishmentType === 'Conducted');
   const justified = ratedPlanned.filter((plan) => plan.accomplishmentType === 'Not Conducted - Justified');
   const missing = ratedPlanned.filter((plan) => !plan.accomplishmentType);
@@ -666,18 +715,19 @@ function ratingStats(plans) {
   const averageReportGrade = accomplishedReports.length
     ? Math.round(accomplishedReports.reduce((sum, plan) => sum + reportGrade(plan), 0) / accomplishedReports.length)
     : null;
-  const scoredPlans = plans.filter((plan) => plan.accomplishmentType);
+  const scoredPlans = plans.filter((plan) => plan.accomplishmentType && !isNonRatedOfficialStatus(plan));
   const totalPlus = scoredPlans.reduce((sum, plan) => sum + earnedPlusFactor(plan), 0);
   const averageAdjusted = scoredPlans.length
     ? Math.round(scoredPlans.reduce((sum, plan) => sum + adjustedScore(plan), 0) / scoredPlans.length)
     : 0;
-  return { ratedPlanned, conducted, justified, missing, bossChanges, efficiency, bossRating, averageReportGrade, totalPlus, averageAdjusted };
+  return { ratedPlanned, conducted, justified, missing, bossChanges, nonRatedOfficial, efficiency, bossRating, averageReportGrade, totalPlus, averageAdjusted };
 }
 
 function statusLabel(plan) {
   if (!plan.accomplishmentType) return '<span class="status pending">No accomplishment yet</span>';
   if (plan.accomplishmentType === 'Conducted') return '<span class="status conducted">Conducted</span>';
   if (plan.accomplishmentType === 'Boss Instruction') return '<span class="status boss">Boss instruction</span>';
+  if (isNonRatedOfficialStatus(plan)) return `<span class="status excluded">${escapeHtml(plan.accomplishmentType)}</span>`;
   return '<span class="status justified">Not conducted</span>';
 }
 
@@ -686,6 +736,9 @@ function ratingEffect(plan) {
   if (plan.accomplishmentType === 'Conducted') return `Rated as conducted (${plan.accomplishmentPercent || 100}%), adjusted ${adjustedScoreText(plan)}`;
   if (plan.accomplishmentType === 'Boss Instruction') {
     return `No penalty on planned task. New task adjusted ${adjustedScoreText(plan)}.`;
+  }
+  if (isNonRatedOfficialStatus(plan)) {
+    return `${plan.accomplishmentType} is recorded but excluded from marking.`;
   }
   return 'Counted as not conducted; justification required.';
 }
@@ -810,6 +863,7 @@ function renderDashboard() {
       <td>${stats.conducted.length}</td>
       <td>${stats.justified.length + stats.missing.length}</td>
       <td>${stats.bossChanges.length}</td>
+      <td>${stats.nonRatedOfficial.length}</td>
       <td>${stats.efficiency}%</td>
       <td>${stats.bossRating}%</td>
       <td>${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}</td>
@@ -826,7 +880,7 @@ function renderDashboard() {
         <span class="staff-meta">${stats.conducted.length}/${stats.ratedPlanned.length} conducted</span>
       </div>
       <div class="bar" aria-label="${escapeHtml(name)} efficiency ${stats.efficiency}%"><span style="width: ${stats.efficiency}%"></span></div>
-      <div class="staff-meta">${stats.bossChanges.length} boss-instructed change(s), boss task rating ${stats.bossRating}%, report grade ${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}, adjusted score ${stats.averageAdjusted}%</div>
+      <div class="staff-meta">${stats.nonRatedOfficial.length} excluded day(s), ${stats.bossChanges.length} boss-instructed change(s), boss task rating ${stats.bossRating}%, report grade ${stats.averageReportGrade === null ? 'N/A' : `${stats.averageReportGrade}%`}, adjusted score ${stats.averageAdjusted}%</div>
     `;
     els.staffList.append(item);
   });
@@ -1023,6 +1077,19 @@ function updateAdjustedScorePreview() {
     workType: els.accomplishmentWorkType.value
   };
   els.adjustedScorePreview.textContent = adjustedScoreText(tempPlan);
+}
+
+function syncAccomplishmentStatusControls() {
+  const nonRated = nonRatedAccomplishmentTypes.includes(els.accomplishmentType.value);
+  if (nonRated) {
+    els.accomplishmentPercent.value = 0;
+    els.accomplishmentTechnicalAssistance.checked = false;
+  }
+  els.accomplishmentPercent.disabled = nonRated;
+  els.accomplishmentWorkType.disabled = nonRated;
+  els.accomplishmentTechnicalAssistance.disabled = nonRated;
+  updateReportGradePreview();
+  updateAdjustedScorePreview();
 }
 
 function setLocationStatus(lat, lng, capturedAt = new Date().toISOString()) {
@@ -1263,7 +1330,7 @@ function showAccomplishmentForm(plan = null) {
   els.taPhotoInput.value = '';
   els.accomplishmentStaff.disabled = isStaff() && !isAdmin();
   updateReportGradePreview();
-  updateAdjustedScorePreview();
+  syncAccomplishmentStatusControls();
   if (!plan) {
     savePlans();
     renderAll();
@@ -1276,6 +1343,9 @@ function hideAccomplishmentForm() {
   els.accomplishmentForm.reset();
   els.accomplishmentPlanId.value = '';
   els.accomplishmentStaff.disabled = false;
+  els.accomplishmentPercent.disabled = false;
+  els.accomplishmentWorkType.disabled = false;
+  els.accomplishmentTechnicalAssistance.disabled = false;
   setLocationStatus('', '', '');
   setPhotoPreview('');
   updateReportGradePreview();
@@ -1290,19 +1360,20 @@ function saveAccomplishment(event) {
   const allowed = isAdmin() || (isStaff() && (isBossOnlyTask ? state.access.staffCanBossTask : state.access.staffCanAccomplish));
   if (!allowed) return;
   const type = els.accomplishmentType.value;
+  const nonRated = nonRatedAccomplishmentTypes.includes(type);
   const justification = els.accomplishmentJustification.value.trim();
   if (type !== 'Conducted' && !justification) {
-    alert('Please encode the justification or Boss instruction details.');
+    alert('Please encode the justification, official travel details, leave/absence details, or Boss instruction details.');
     return;
   }
   plan.staffName = isStaff() ? state.session.staffName : els.accomplishmentStaff.value;
   plan.accomplishmentDate = els.accomplishmentDate.value;
   plan.accomplishmentType = type;
-  plan.accomplishmentPercent = Number(els.accomplishmentPercent.value);
-  plan.workType = els.accomplishmentWorkType.value;
+  plan.accomplishmentPercent = nonRated ? 0 : Number(els.accomplishmentPercent.value);
+  plan.workType = nonRated ? (plan.workType || 'Regular Work') : els.accomplishmentWorkType.value;
   plan.accomplishmentOutput = els.accomplishmentOutput.value.trim();
   plan.justification = justification;
-  plan.technicalAssistance = els.accomplishmentTechnicalAssistance.checked;
+  plan.technicalAssistance = nonRated ? false : els.accomplishmentTechnicalAssistance.checked;
   plan.cropStage = plan.technicalAssistance ? els.cropStage.value : '';
   plan.reportDetails = els.reportDetails.value.trim();
   plan.taLatitude = plan.technicalAssistance ? els.locationStatus.dataset.lat || '' : '';
@@ -1416,7 +1487,7 @@ function exportCsv() {
     ['Week Start', els.weekStart.value],
     ['Week End', els.weekEnd.value],
     [],
-    ['Staff', 'Planned Date', 'Program', 'Work Type', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'Crop Stage', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Plus Factor', 'Adjusted Score', 'Latitude', 'Longitude', 'Justification / Boss Instruction', 'Technical / Operational Details', 'Applicable Checklist Count', 'System Detected Checklist', 'TA Report Grade', 'Rating Effect'],
+    ['Staff', 'Planned Date', 'Program', 'Work Type', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'Crop Stage / Service Category', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Plus Factor', 'Adjusted Score', 'Latitude', 'Longitude', 'Justification / Boss Instruction / Official Status Details', 'Technical / Operational Details', 'Applicable Checklist Count', 'System Detected Checklist', 'TA Report Grade', 'Rating Effect'],
     ...filteredPlans().map((plan) => [
       plan.staffName,
       plan.datePlanned,
@@ -1430,9 +1501,9 @@ function exportCsv() {
       plan.accomplishmentType || '',
       plan.accomplishmentDate || '',
       plan.accomplishmentOutput || '',
-      plan.accomplishmentPercent === undefined ? '' : `${plan.accomplishmentPercent}%`,
+      isNonRatedOfficialStatus(plan) ? 'Excluded' : plan.accomplishmentPercent === undefined ? '' : `${plan.accomplishmentPercent}%`,
       earnedPlusFactor(plan),
-      plan.accomplishmentType ? `${adjustedScore(plan)}%` : '',
+      isNonRatedOfficialStatus(plan) ? 'Excluded' : plan.accomplishmentType ? `${adjustedScore(plan)}%` : '',
       plan.taLatitude || '',
       plan.taLongitude || '',
       plan.justification || '',
@@ -1652,7 +1723,7 @@ function bindEvents() {
   els.accomplishmentDate.addEventListener('change', updateReportGradePreview);
   els.accomplishmentTechnicalAssistance.addEventListener('change', updateReportGradePreview);
   els.cropStage.addEventListener('change', updateReportGradePreview);
-  els.accomplishmentType.addEventListener('change', updateAdjustedScorePreview);
+  els.accomplishmentType.addEventListener('change', syncAccomplishmentStatusControls);
   els.accomplishmentPercent.addEventListener('input', updateAdjustedScorePreview);
   els.accomplishmentWorkType.addEventListener('change', updateAdjustedScorePreview);
   els.captureLocationBtn.addEventListener('click', captureCurrentLocation);
