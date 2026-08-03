@@ -235,6 +235,7 @@ const els = {
   reportDetailsGuide: document.querySelector('#reportDetailsGuide'),
   serviceCategoryLabel: document.querySelector('#serviceCategoryLabel'),
   cropStage: document.querySelector('#cropStage'),
+  autoChecklistHeading: document.querySelector('#autoChecklistHeading'),
   reportDetails: document.querySelector('#reportDetails'),
   autoChecklistPreview: document.querySelector('#autoChecklistPreview'),
   reportGradePreview: document.querySelector('#reportGradePreview'),
@@ -423,6 +424,14 @@ function technicalAssistanceCategory(plan) {
   if (plan.program === 'Fishery') return `Fishery technical assistance: ${serviceCategoryFor(plan)}`;
   if (plan.program === 'Biosystems Engineering') return `Biosystems engineering technical assistance: ${serviceCategoryFor(plan)}`;
   return 'Program technical assistance';
+}
+
+function programChecklistTitle(program) {
+  if (isCropProgram(program)) return `${program} Crop Technical Assistance Checklist`;
+  if (program === 'Livestock') return 'Livestock Technical Assistance Checklist';
+  if (program === 'Fishery') return 'Fishery Technical Assistance Checklist';
+  if (program === 'Biosystems Engineering') return 'Biosystems Engineering Technical Assistance Checklist';
+  return 'Technical Assistance Checklist';
 }
 
 function detectedReportItems(plan) {
@@ -1212,9 +1221,10 @@ function renderFieldMap() {
 
 function updateReportGradePreview() {
   const sourcePlan = state.plans.find((item) => item.id === els.accomplishmentPlanId.value);
+  const selectedProgram = els.accomplishmentProgram.value || sourcePlan?.program || programs[0];
   const tempPlan = {
     staffName: els.accomplishmentStaff.value,
-    program: els.accomplishmentProgram.value || sourcePlan?.program || programs[0],
+    program: selectedProgram,
     place: sourcePlan?.place || '',
     clients: sourcePlan?.clients || '',
     datePlanned: els.accomplishmentDate.value,
@@ -1230,6 +1240,7 @@ function updateReportGradePreview() {
     taLongitude: els.locationStatus.dataset.lng || '',
     taPhotoData: els.taPhotoPreview.dataset.photoData || ''
   };
+  if (els.autoChecklistHeading) els.autoChecklistHeading.textContent = programChecklistTitle(selectedProgram);
   setTechnicalAssistanceIndicator(els.accomplishmentTechnicalAssistance, technicalAssistanceApplies(tempPlan));
   const detected = detectedReportItems(tempPlan);
   const applicable = applicableReportItems(tempPlan);
@@ -1395,7 +1406,11 @@ function installApp() {
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    navigator.serviceWorker.register('service-worker.js')
+      .then((registration) => {
+        registration.update().catch(() => {});
+      })
+      .catch(() => {});
   });
 }
 
