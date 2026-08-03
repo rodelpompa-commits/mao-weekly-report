@@ -210,6 +210,17 @@
               <input id="accomplishmentDate" type="date" required />
             </div>
             <div class="field">
+              <label for="accomplishmentProgram">Program</label>
+              <select id="accomplishmentProgram" required>
+                <option>Rice</option>
+                <option>HVCC</option>
+                <option>Corn</option>
+                <option>Livestock</option>
+                <option>Fishery</option>
+                <option>Biosystems Engineering</option>
+              </select>
+            </div>
+            <div class="field">
               <label for="accomplishmentType">Result</label>
               <select id="accomplishmentType" required>
                 <option value="Conducted">Planned task conducted</option>
@@ -267,18 +278,8 @@
               <button class="subtle-btn polish-btn" type="button" data-polish-target="reportDetails">Check Grammar</button>
             </div>
             <div class="field">
-              <label for="cropStage">Crop Stage / Service Category</label>
-              <select id="cropStage">
-                <option value="Not crop-specific">Not crop-specific</option>
-                <option>Land preparation</option>
-                <option>Seedbed</option>
-                <option>Newly planted</option>
-                <option>Vegetative</option>
-                <option>Reproductive</option>
-                <option>Maturity</option>
-                <option>Harvesting</option>
-                <option>Marketing</option>
-              </select>
+              <label for="cropStage" id="serviceCategoryLabel">Crop Stage / Service Category</label>
+              <select id="cropStage"></select>
             </div>
             <div class="report-checklist auto-checklist full">
               <div class="auto-checklist-heading">System-detected reporting checklist for the applicable program</div>

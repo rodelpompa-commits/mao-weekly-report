@@ -36,6 +36,12 @@ const plusFactors = {
   'System Creation': 10
 };
 const allCropStages = ['Land preparation', 'Seedbed', 'Newly planted', 'Vegetative', 'Reproductive', 'Maturity', 'Harvesting', 'Marketing'];
+const serviceCategoryOptions = {
+  crop: ['Not crop-specific', ...allCropStages],
+  Livestock: ['Animal health consultation', 'Disease diagnosis / mortality concern', 'Feeds and nutrition advisory', 'Housing / sanitation / biosecurity', 'Vaccination / treatment referral', 'Livestock dispersal / production monitoring'],
+  Fishery: ['Aquaculture / pond technical assistance', 'Capture fishery / gear / boat concern', 'Water quality / habitat assessment', 'Stocking / feeding / production advisory', 'Fish health / fish kill / losses', 'Registration / licensing / regulatory assistance'],
+  'Biosystems Engineering': ['Farm machinery / equipment assistance', 'Irrigation / water system assistance', 'Post-harvest facility / structure assistance', 'Project inspection / validation', 'Repair / maintenance / safety concern', 'Engineering measurement / design / compliance']
+};
 const nonRatedAccomplishmentTypes = ['Absent', 'Leave', 'Official Travel'];
 const sharedTaReportRubric = [
   {
@@ -178,6 +184,7 @@ const els = {
   accomplishmentPlanId: document.querySelector('#accomplishmentPlanId'),
   accomplishmentStaff: document.querySelector('#accomplishmentStaff'),
   accomplishmentDate: document.querySelector('#accomplishmentDate'),
+  accomplishmentProgram: document.querySelector('#accomplishmentProgram'),
   accomplishmentType: document.querySelector('#accomplishmentType'),
   accomplishmentPercent: document.querySelector('#accomplishmentPercent'),
   accomplishmentWorkType: document.querySelector('#accomplishmentWorkType'),
@@ -189,6 +196,7 @@ const els = {
   captureLocationBtn: document.querySelector('#captureLocationBtn'),
   locationStatus: document.querySelector('#locationStatus'),
   taPhotoPreview: document.querySelector('#taPhotoPreview'),
+  serviceCategoryLabel: document.querySelector('#serviceCategoryLabel'),
   cropStage: document.querySelector('#cropStage'),
   reportDetails: document.querySelector('#reportDetails'),
   autoChecklistPreview: document.querySelector('#autoChecklistPreview'),
@@ -338,6 +346,12 @@ function cropStageFor(plan) {
   return allCropStages.includes(plan.cropStage) ? plan.cropStage : 'Not crop-specific';
 }
 
+function serviceCategoryFor(plan) {
+  if (isCropProgram(plan.program)) return cropStageFor(plan);
+  const options = serviceCategoryOptions[plan.program] || ['General technical assistance'];
+  return options.includes(plan.cropStage) ? plan.cropStage : options[0];
+}
+
 function isCropProgram(program = '') {
   return ['Rice', 'HVCC', 'Corn'].includes(program);
 }
@@ -368,9 +382,9 @@ function applicableReportItems(plan) {
 function technicalAssistanceCategory(plan) {
   if (!technicalAssistanceApplies(plan)) return 'Not graded under technical-assistance checklist';
   if (isCropProgram(plan.program)) return `Crop stage: ${cropStageFor(plan)}`;
-  if (plan.program === 'Livestock') return 'Livestock technical assistance';
-  if (plan.program === 'Fishery') return 'Fishery technical assistance';
-  if (plan.program === 'Biosystems Engineering') return 'Biosystems engineering technical assistance';
+  if (plan.program === 'Livestock') return `Livestock technical assistance: ${serviceCategoryFor(plan)}`;
+  if (plan.program === 'Fishery') return `Fishery technical assistance: ${serviceCategoryFor(plan)}`;
+  if (plan.program === 'Biosystems Engineering') return `Biosystems engineering technical assistance: ${serviceCategoryFor(plan)}`;
   return 'Program technical assistance';
 }
 
@@ -1160,11 +1174,12 @@ function renderFieldMap() {
 }
 
 function updateReportGradePreview() {
+  const sourcePlan = state.plans.find((item) => item.id === els.accomplishmentPlanId.value);
   const tempPlan = {
     staffName: els.accomplishmentStaff.value,
-    program: state.plans.find((item) => item.id === els.accomplishmentPlanId.value)?.program || programs[0],
-    place: state.plans.find((item) => item.id === els.accomplishmentPlanId.value)?.place || '',
-    clients: state.plans.find((item) => item.id === els.accomplishmentPlanId.value)?.clients || '',
+    program: els.accomplishmentProgram.value || sourcePlan?.program || programs[0],
+    place: sourcePlan?.place || '',
+    clients: sourcePlan?.clients || '',
     datePlanned: els.accomplishmentDate.value,
     accomplishmentDate: els.accomplishmentDate.value,
     task: els.accomplishmentOutput.value,
@@ -1189,6 +1204,18 @@ function updateReportGradePreview() {
       return `<span class="${matched ? 'detected' : 'missing'}">${matched ? 'Detected' : 'Missing'}: ${escapeHtml(item.label)}</span>`;
     }).join('');
   }
+}
+
+function updateServiceCategoryOptions(program, selectedValue = '') {
+  if (!els.cropStage) return;
+  const cropProgram = isCropProgram(program);
+  const options = cropProgram
+    ? serviceCategoryOptions.crop
+    : serviceCategoryOptions[program] || ['General technical assistance'];
+  els.serviceCategoryLabel.textContent = cropProgram ? 'Crop Stage' : 'Service Category';
+  els.cropStage.innerHTML = '';
+  options.forEach((option) => els.cropStage.add(new Option(option, option)));
+  els.cropStage.value = options.includes(selectedValue) ? selectedValue : options[0];
 }
 
 function updateAdjustedScorePreview() {
@@ -1458,18 +1485,20 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentPlanId.value = target.id;
   els.accomplishmentStaff.value = target.staffName;
   els.accomplishmentDate.value = target.accomplishmentDate || target.datePlanned || els.weekStart.value;
+  els.accomplishmentProgram.value = target.program || programs[0];
   els.accomplishmentType.value = target.accomplishmentType || (plan ? 'Conducted' : 'Boss Instruction');
   els.accomplishmentPercent.value = target.accomplishmentPercent ?? 100;
   els.accomplishmentWorkType.value = target.workType || 'Regular Work';
   els.accomplishmentOutput.value = target.accomplishmentOutput || target.task || '';
   els.accomplishmentJustification.value = target.justification || '';
   setTechnicalAssistanceIndicator(els.accomplishmentTechnicalAssistance, technicalAssistanceApplies(target));
-  els.cropStage.value = target.cropStage || 'Not crop-specific';
+  updateServiceCategoryOptions(els.accomplishmentProgram.value, target.cropStage || '');
   els.reportDetails.value = target.reportDetails || '';
   setLocationStatus(target.taLatitude || '', target.taLongitude || '', target.taLocationCapturedAt || '');
   setPhotoPreview(target.taPhotoData || '');
   els.taPhotoInput.value = '';
   els.accomplishmentStaff.disabled = isStaff() && !isAdmin();
+  els.accomplishmentProgram.disabled = Boolean(plan && plan.task !== 'New task instructed by the Boss');
   updateReportGradePreview();
   syncAccomplishmentStatusControls();
   if (!plan) {
@@ -1484,6 +1513,7 @@ function hideAccomplishmentForm() {
   els.accomplishmentForm.reset();
   els.accomplishmentPlanId.value = '';
   els.accomplishmentStaff.disabled = false;
+  els.accomplishmentProgram.disabled = false;
   els.accomplishmentPercent.disabled = false;
   els.accomplishmentWorkType.disabled = false;
   setLocationStatus('', '', '');
@@ -1508,6 +1538,7 @@ function saveAccomplishment(event) {
     return;
   }
   plan.staffName = isStaff() ? state.session.staffName : els.accomplishmentStaff.value;
+  plan.program = els.accomplishmentProgram.value;
   plan.accomplishmentDate = els.accomplishmentDate.value;
   plan.accomplishmentType = type;
   plan.accomplishmentPercent = nonRated ? 0 : Number(els.accomplishmentPercent.value);
@@ -1521,7 +1552,7 @@ function saveAccomplishment(event) {
   plan.taPhotoData = nonRated ? '' : els.taPhotoPreview.dataset.photoData || '';
   const detectedTechnicalAssistance = !nonRated && technicalAssistanceApplies(plan);
   plan.technicalAssistance = detectedTechnicalAssistance;
-  plan.cropStage = plan.technicalAssistance ? els.cropStage.value : '';
+  plan.cropStage = plan.technicalAssistance ? serviceCategoryFor({ ...plan, cropStage: els.cropStage.value }) : '';
   if (!plan.technicalAssistance) {
     plan.taLatitude = '';
     plan.taLongitude = '';
@@ -1531,7 +1562,6 @@ function saveAccomplishment(event) {
   plan.reportItems = detectedReportItems(plan);
   if (type === 'Boss Instruction' && plan.task === 'New task instructed by the Boss') {
     plan.task = plan.accomplishmentOutput;
-    plan.program = plan.program || programs[0];
     plan.datePlanned = plan.accomplishmentDate;
     plan.weekStart = els.weekStart.value;
     plan.weekEnd = els.weekEnd.value;
@@ -1646,7 +1676,7 @@ function exportCsv() {
       plan.place,
       plan.clients,
       technicalAssistanceApplies(plan) ? 'Yes' : 'No',
-      technicalAssistanceApplies(plan) ? cropStageFor(plan) : '',
+      technicalAssistanceApplies(plan) ? serviceCategoryFor(plan) : '',
       plan.accomplishmentType || '',
       plan.accomplishmentDate || '',
       plan.accomplishmentOutput || '',
@@ -1874,6 +1904,10 @@ function bindEvents() {
   els.accomplishmentJustification.addEventListener('input', updateReportGradePreview);
   els.accomplishmentStaff.addEventListener('change', updateReportGradePreview);
   els.accomplishmentDate.addEventListener('change', updateReportGradePreview);
+  els.accomplishmentProgram.addEventListener('change', () => {
+    updateServiceCategoryOptions(els.accomplishmentProgram.value, els.cropStage.value);
+    updateReportGradePreview();
+  });
   els.cropStage.addEventListener('change', updateReportGradePreview);
   els.accomplishmentType.addEventListener('change', syncAccomplishmentStatusControls);
   els.accomplishmentPercent.addEventListener('input', updateAdjustedScorePreview);
