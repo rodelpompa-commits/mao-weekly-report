@@ -309,6 +309,24 @@ function normalizedReportText(plan) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
+function systemDetectsTechnicalAssistance(plan) {
+  if (isNonRatedOfficialStatus(plan)) return false;
+  const text = normalizedReportText(plan);
+  const assistancePattern = /\b(technical assistance|ta\b|field visit|farm visit|site visit|assisted|assist|advised|consultation|consulted|validated|validation|inspection|inspected|training|coaching|demonstration|demo|diagnosis|recommendation|intervention|follow-up|follow up|client concern|farmer|grower|raiser|fisherfolk|beneficiary)\b/;
+  const programPattern = /\b(crop|rice|corn|hvcc|vegetable|livestock|animal|swine|hog|cattle|carabao|goat|poultry|fishery|fish|pond|coastal|biosystems|engineering|equipment|facility|irrigation|post-harvest|project site)\b/;
+  return Boolean(
+    plan.taLatitude ||
+    plan.taLongitude ||
+    plan.taPhotoData ||
+    assistancePattern.test(text) ||
+    (programPattern.test(text) && /\b(client|farmer|grower|raiser|fisherfolk|beneficiary|field|site|barangay|farm|pond|project)\b/.test(text))
+  );
+}
+
+function technicalAssistanceApplies(plan) {
+  return systemDetectsTechnicalAssistance(plan);
+}
+
 function cropStageFor(plan) {
   return allCropStages.includes(plan.cropStage) ? plan.cropStage : 'Not crop-specific';
 }
@@ -341,7 +359,7 @@ function applicableReportItems(plan) {
 }
 
 function detectedReportItems(plan) {
-  if (!plan.technicalAssistance) return [];
+  if (!technicalAssistanceApplies(plan)) return [];
   const text = normalizedReportText(plan);
   return applicableReportItems(plan)
     .filter((item) => {
@@ -352,7 +370,7 @@ function detectedReportItems(plan) {
 }
 
 function reportGrade(plan) {
-  if (!plan.technicalAssistance) return null;
+  if (!technicalAssistanceApplies(plan)) return null;
   const checkedItems = detectedReportItems(plan).length;
   const applicableItems = applicableReportItems(plan).length || sharedTaReportRubric.length;
   return Math.round((checkedItems / applicableItems) * 100);
@@ -711,7 +729,7 @@ function ratingStats(plans) {
   const bossRating = bossChanges.length
     ? Math.round(bossChanges.reduce((sum, plan) => sum + Number(plan.accomplishmentPercent || 0), 0) / bossChanges.length)
     : 0;
-  const accomplishedReports = plans.filter((plan) => plan.accomplishmentType && plan.technicalAssistance);
+  const accomplishedReports = plans.filter((plan) => plan.accomplishmentType && technicalAssistanceApplies(plan));
   const averageReportGrade = accomplishedReports.length
     ? Math.round(accomplishedReports.reduce((sum, plan) => sum + reportGrade(plan), 0) / accomplishedReports.length)
     : null;
@@ -786,7 +804,7 @@ function renderPlanRows() {
       <td>${escapeHtml(plan.task)}</td>
       <td>${escapeHtml(plan.place)}</td>
       <td>${escapeHtml(plan.clients || '')}</td>
-      <td>${plan.technicalAssistance ? 'Yes' : 'No'}</td>
+      <td>${technicalAssistanceApplies(plan) ? 'Yes' : 'No'}</td>
       <td>${statusLabel(plan)}</td>
       <td>
         <div class="row-actions">
@@ -810,15 +828,16 @@ function renderAccomplishmentRows() {
     const accomplishment = plan.accomplishmentType
       ? `${escapeHtml(plan.accomplishmentOutput || '')}<div class="staff-meta">${escapeHtml(plan.justification || '')}</div>`
       : '<span class="staff-meta">Waiting for accomplishment entry</span>';
-    const evidence = plan.technicalAssistance && (plan.taLatitude || plan.taPhotoData)
+    const isTechnicalAssistance = technicalAssistanceApplies(plan);
+    const evidence = isTechnicalAssistance && (plan.taLatitude || plan.taPhotoData)
       ? `<div class="staff-meta">Evidence: ${plan.taLatitude && plan.taLongitude ? `${Number(plan.taLatitude).toFixed(5)}, ${Number(plan.taLongitude).toFixed(5)}` : 'photo attached'}</div>`
       : '';
     const reportReference = [
       escapeHtml(plan.reportDetails || ''),
-      plan.technicalAssistance ? `<div class="staff-meta">Crop stage: ${escapeHtml(cropStageFor(plan))}</div>` : '',
-      plan.technicalAssistance && detectedReportItems(plan).length
+      isTechnicalAssistance ? `<div class="staff-meta">Crop stage/category: ${escapeHtml(cropStageFor(plan))}</div>` : '',
+      isTechnicalAssistance && detectedReportItems(plan).length
         ? `<div class="staff-meta">System detected ${detectedReportItems(plan).length}/${applicableReportItems(plan).length}: ${escapeHtml(detectedReportItems(plan).join(', '))}</div>`
-        : `<div class="staff-meta">${plan.technicalAssistance ? 'No checklist evidence detected yet' : 'Not graded under technical-assistance checklist'}</div>`
+        : `<div class="staff-meta">${isTechnicalAssistance ? 'No checklist evidence detected yet' : 'Not graded under technical-assistance checklist'}</div>`
     ].join('');
     const grade = reportGrade(plan);
     const gradeHtml = `<span class="grade ${reportGradeClass(grade)}">${reportGradeText(plan)}</span>`;
@@ -984,7 +1003,7 @@ function panFieldMap(deltaX, deltaY, svg) {
 function renderFieldMap() {
   if (!els.fieldMap) return;
   const rings = boundaryCoordinates();
-  const points = filteredPlans().filter((plan) => plan.technicalAssistance && plan.taLatitude && plan.taLongitude);
+  const points = filteredPlans().filter((plan) => technicalAssistanceApplies(plan) && plan.taLatitude && plan.taLongitude);
   if (!rings.length) {
     els.fieldMap.innerHTML = '<p class="empty-state">Boundary map is loading.</p>';
     return;
@@ -1046,11 +1065,15 @@ function renderFieldMap() {
 function updateReportGradePreview() {
   const tempPlan = {
     staffName: els.accomplishmentStaff.value,
+    program: state.plans.find((item) => item.id === els.accomplishmentPlanId.value)?.program || programs[0],
+    place: state.plans.find((item) => item.id === els.accomplishmentPlanId.value)?.place || '',
+    clients: state.plans.find((item) => item.id === els.accomplishmentPlanId.value)?.clients || '',
     datePlanned: els.accomplishmentDate.value,
     accomplishmentDate: els.accomplishmentDate.value,
     task: els.accomplishmentOutput.value,
     accomplishmentOutput: els.accomplishmentOutput.value,
     justification: els.accomplishmentJustification.value,
+    accomplishmentType: els.accomplishmentType.value,
     cropStage: els.cropStage.value,
     reportDetails: els.reportDetails.value,
     technicalAssistance: els.accomplishmentTechnicalAssistance.checked,
@@ -1058,6 +1081,7 @@ function updateReportGradePreview() {
     taLongitude: els.locationStatus.dataset.lng || '',
     taPhotoData: els.taPhotoPreview.dataset.photoData || ''
   };
+  els.accomplishmentTechnicalAssistance.checked = technicalAssistanceApplies(tempPlan);
   const detected = detectedReportItems(tempPlan);
   const applicable = applicableReportItems(tempPlan);
   els.reportGradePreview.textContent = reportGradeText(tempPlan);
@@ -1079,6 +1103,18 @@ function updateAdjustedScorePreview() {
   els.adjustedScorePreview.textContent = adjustedScoreText(tempPlan);
 }
 
+function updatePlanTechnicalAssistanceIndicator() {
+  const tempPlan = {
+    staffName: els.planStaff.value,
+    program: els.planProgram.value,
+    place: els.planPlace.value,
+    task: els.planTask.value,
+    clients: els.planClients.value,
+    datePlanned: els.planDate.value
+  };
+  els.planTechnicalAssistance.checked = technicalAssistanceApplies(tempPlan);
+}
+
 function syncAccomplishmentStatusControls() {
   const nonRated = nonRatedAccomplishmentTypes.includes(els.accomplishmentType.value);
   if (nonRated) {
@@ -1087,7 +1123,7 @@ function syncAccomplishmentStatusControls() {
   }
   els.accomplishmentPercent.disabled = nonRated;
   els.accomplishmentWorkType.disabled = nonRated;
-  els.accomplishmentTechnicalAssistance.disabled = nonRated;
+  els.accomplishmentTechnicalAssistance.disabled = true;
   updateReportGradePreview();
   updateAdjustedScorePreview();
 }
@@ -1247,14 +1283,16 @@ function showPlanForm(plan = null) {
     els.planPlace.value = plan.place;
     els.planTask.value = plan.task;
     els.planClients.value = plan.clients || '';
-    els.planTechnicalAssistance.checked = Boolean(plan.technicalAssistance);
+    els.planTechnicalAssistance.checked = technicalAssistanceApplies(plan);
   } else {
     els.planForm.reset();
     els.planId.value = '';
     els.planDate.value = els.weekStart.value;
     els.planWorkType.value = 'Regular Work';
     if (isStaff()) els.planStaff.value = state.session.staffName;
+    updatePlanTechnicalAssistanceIndicator();
   }
+  els.planTechnicalAssistance.disabled = true;
   els.planStaff.disabled = isStaff() && !isAdmin();
   els.planTask.focus();
 }
@@ -1281,9 +1319,9 @@ function savePlan(event) {
     workType: els.planWorkType.value,
     place: els.planPlace.value.trim(),
     task: els.planTask.value.trim(),
-    clients: els.planClients.value.trim(),
-    technicalAssistance: els.planTechnicalAssistance.checked
+    clients: els.planClients.value.trim()
   };
+  plan.technicalAssistance = technicalAssistanceApplies(plan);
   const index = state.plans.findIndex((item) => item.id === plan.id);
   if (index >= 0) state.plans[index] = plan;
   else state.plans.unshift(plan);
@@ -1322,7 +1360,8 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentWorkType.value = target.workType || 'Regular Work';
   els.accomplishmentOutput.value = target.accomplishmentOutput || target.task || '';
   els.accomplishmentJustification.value = target.justification || '';
-  els.accomplishmentTechnicalAssistance.checked = Boolean(target.technicalAssistance);
+  els.accomplishmentTechnicalAssistance.checked = technicalAssistanceApplies(target);
+  els.accomplishmentTechnicalAssistance.disabled = true;
   els.cropStage.value = target.cropStage || 'Not crop-specific';
   els.reportDetails.value = target.reportDetails || '';
   setLocationStatus(target.taLatitude || '', target.taLongitude || '', target.taLocationCapturedAt || '');
@@ -1345,7 +1384,7 @@ function hideAccomplishmentForm() {
   els.accomplishmentStaff.disabled = false;
   els.accomplishmentPercent.disabled = false;
   els.accomplishmentWorkType.disabled = false;
-  els.accomplishmentTechnicalAssistance.disabled = false;
+  els.accomplishmentTechnicalAssistance.disabled = true;
   setLocationStatus('', '', '');
   setPhotoPreview('');
   updateReportGradePreview();
@@ -1373,13 +1412,20 @@ function saveAccomplishment(event) {
   plan.workType = nonRated ? (plan.workType || 'Regular Work') : els.accomplishmentWorkType.value;
   plan.accomplishmentOutput = els.accomplishmentOutput.value.trim();
   plan.justification = justification;
-  plan.technicalAssistance = nonRated ? false : els.accomplishmentTechnicalAssistance.checked;
-  plan.cropStage = plan.technicalAssistance ? els.cropStage.value : '';
   plan.reportDetails = els.reportDetails.value.trim();
-  plan.taLatitude = plan.technicalAssistance ? els.locationStatus.dataset.lat || '' : '';
-  plan.taLongitude = plan.technicalAssistance ? els.locationStatus.dataset.lng || '' : '';
-  plan.taLocationCapturedAt = plan.technicalAssistance ? els.locationStatus.dataset.capturedAt || '' : '';
-  plan.taPhotoData = plan.technicalAssistance ? els.taPhotoPreview.dataset.photoData || '' : '';
+  plan.taLatitude = nonRated ? '' : els.locationStatus.dataset.lat || '';
+  plan.taLongitude = nonRated ? '' : els.locationStatus.dataset.lng || '';
+  plan.taLocationCapturedAt = nonRated ? '' : els.locationStatus.dataset.capturedAt || '';
+  plan.taPhotoData = nonRated ? '' : els.taPhotoPreview.dataset.photoData || '';
+  const detectedTechnicalAssistance = !nonRated && technicalAssistanceApplies(plan);
+  plan.technicalAssistance = detectedTechnicalAssistance;
+  plan.cropStage = plan.technicalAssistance ? els.cropStage.value : '';
+  if (!plan.technicalAssistance) {
+    plan.taLatitude = '';
+    plan.taLongitude = '';
+    plan.taLocationCapturedAt = '';
+    plan.taPhotoData = '';
+  }
   plan.reportItems = detectedReportItems(plan);
   if (type === 'Boss Instruction' && plan.task === 'New task instructed by the Boss') {
     plan.task = plan.accomplishmentOutput;
@@ -1496,8 +1542,8 @@ function exportCsv() {
       plan.task,
       plan.place,
       plan.clients,
-      plan.technicalAssistance ? 'Yes' : 'No',
-      plan.technicalAssistance ? cropStageFor(plan) : '',
+      technicalAssistanceApplies(plan) ? 'Yes' : 'No',
+      technicalAssistanceApplies(plan) ? cropStageFor(plan) : '',
       plan.accomplishmentType || '',
       plan.accomplishmentDate || '',
       plan.accomplishmentOutput || '',
@@ -1508,7 +1554,7 @@ function exportCsv() {
       plan.taLongitude || '',
       plan.justification || '',
       plan.reportDetails || '',
-      plan.technicalAssistance ? applicableReportItems(plan).length : '',
+      technicalAssistanceApplies(plan) ? applicableReportItems(plan).length : '',
       detectedReportItems(plan).join('; '),
       reportGradeText(plan),
       ratingEffect(plan)
@@ -1649,6 +1695,10 @@ function bindEvents() {
   document.querySelector('#addPlanBtn').addEventListener('click', () => showPlanForm());
   document.querySelector('#cancelPlanBtn').addEventListener('click', hidePlanForm);
   els.planForm.addEventListener('submit', savePlan);
+  [els.planStaff, els.planDate, els.planProgram, els.planPlace, els.planTask, els.planClients].forEach((input) => {
+    input.addEventListener('input', updatePlanTechnicalAssistanceIndicator);
+    input.addEventListener('change', updatePlanTechnicalAssistanceIndicator);
+  });
   document.querySelector('#addBossTaskBtn').addEventListener('click', () => showAccomplishmentForm());
   document.querySelector('#cancelAccomplishmentBtn').addEventListener('click', hideAccomplishmentForm);
   els.accomplishmentForm.addEventListener('submit', saveAccomplishment);
