@@ -431,6 +431,75 @@ function escapeHtml(value = '') {
     .replaceAll("'", '&#039;');
 }
 
+const grammarReplacements = [
+  [/\bbrgy\.?\b/gi, 'Barangay'],
+  [/\bmao\b/gi, 'MAO'],
+  [/\baew\b/gi, 'AEW'],
+  [/\bhvcc\b/gi, 'HVCC'],
+  [/\btechn?ical as+is?tance\b/gi, 'technical assistance'],
+  [/\btecnical\b/gi, 'technical'],
+  [/\bas+is?tance\b/gi, 'assistance'],
+  [/\baccompl?ishment\b/gi, 'accomplishment'],
+  [/\bitinenary\b/gi, 'itinerary'],
+  [/\breciev(ed|e|ing)\b/gi, 'receiv$1'],
+  [/\bconduct(ed|ing)?\s+technical assistance\b/gi, 'provided technical assistance'],
+  [/\bfollow up\b/gi, 'follow-up'],
+  [/\bpost harvest\b/gi, 'post-harvest'],
+  [/\bwalk in\b/gi, 'walk-in'],
+  [/\bfarmers?\s+ass?ociation\b/gi, 'Farmers Association'],
+  [/\bfisherfolks\b/gi, 'fisherfolk'],
+  [/\blive stocks\b/gi, 'livestock'],
+  [/\bbio systems\b/gi, 'biosystems']
+];
+
+const reportTermReplacements = [
+  [/\brice\b/gi, 'Rice'],
+  [/\bcorn\b/gi, 'Corn'],
+  [/\blivestock\b/gi, 'Livestock'],
+  [/\bfishery\b/gi, 'Fishery'],
+  [/\bbiosystems engineering\b/gi, 'Biosystems Engineering'],
+  [/\bmunicipal agriculture office\b/gi, 'Municipal Agriculture Office'],
+  [/\bbarangay\b/gi, 'Barangay']
+];
+
+function capitalizeSentences(text) {
+  return text.replace(/(^|[.!?]\s+)([a-z])/g, (match, prefix, letter) => `${prefix}${letter.toUpperCase()}`);
+}
+
+function polishReportText(value = '') {
+  let text = String(value)
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/([,.;:!?])([^\s])/g, '$1 $2')
+    .replace(/\bi\b/g, 'I')
+    .trim();
+
+  grammarReplacements.forEach(([pattern, replacement]) => {
+    text = text.replace(pattern, replacement);
+  });
+  reportTermReplacements.forEach(([pattern, replacement]) => {
+    text = text.replace(pattern, replacement);
+  });
+
+  text = capitalizeSentences(text);
+  if (text && !/[.!?]$/.test(text)) text += '.';
+  return text;
+}
+
+function polishField(field) {
+  if (!field || !field.value.trim()) return;
+  field.value = polishReportText(field.value);
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function polishPlanFields() {
+  [els.planPlace, els.planTask, els.planClients].forEach(polishField);
+}
+
+function polishAccomplishmentFields() {
+  [els.accomplishmentOutput, els.accomplishmentJustification, els.reportDetails].forEach(polishField);
+}
+
 function startOfWeek(date) {
   const copy = new Date(date);
   const day = copy.getDay();
@@ -1324,6 +1393,7 @@ function hidePlanForm() {
 function savePlan(event) {
   event.preventDefault();
   if (!(isAdmin() || (isStaff() && state.access.staffCanPlan))) return;
+  polishPlanFields();
   const existing = state.plans.find((plan) => plan.id === els.planId.value);
   const plan = {
     ...(existing || {}),
@@ -1415,6 +1485,7 @@ function saveAccomplishment(event) {
   if (!allowed) return;
   const type = els.accomplishmentType.value;
   const nonRated = nonRatedAccomplishmentTypes.includes(type);
+  polishAccomplishmentFields();
   const justification = els.accomplishmentJustification.value.trim();
   if (type !== 'Conducted' && !justification) {
     alert('Please encode the justification, official travel details, leave/absence details, or Boss instruction details.');
@@ -1812,6 +1883,11 @@ function bindEvents() {
     renderAll();
   });
   document.body.addEventListener('click', (event) => {
+    const polishButton = event.target.closest('button[data-polish-target]');
+    if (polishButton) {
+      polishField(els[polishButton.dataset.polishTarget]);
+      return;
+    }
     const mapButton = event.target.closest('button[data-map-action]');
     if (mapButton) {
       if (mapButton.dataset.mapAction === 'zoom-in') zoomFieldMap(0.72);
