@@ -842,6 +842,11 @@ tbody tr:hover {
   width: auto;
 }
 
+#planTechnicalAssistance,
+#accomplishmentTechnicalAssistance {
+  pointer-events: none;
+}
+
 @media (max-width: 1080px) {
   .controls-panel,
   .metrics,
