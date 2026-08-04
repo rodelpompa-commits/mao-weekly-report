@@ -2112,7 +2112,7 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   y -= 20;
   pdfText(content, reportPeriodText(), pageWidth / 2, y, 11, { align: 'center' });
   y -= 34;
-  const reportInfoX = 338;
+  const reportInfoX = 42;
   const reportInfoWidth = 210;
   const reportInfoCenter = reportInfoX + (reportInfoWidth / 2);
   pdfText(content, 'Name:', reportInfoX, y, 10);
