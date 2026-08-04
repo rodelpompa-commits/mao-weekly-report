@@ -43,93 +43,119 @@ const serviceCategoryOptions = {
   'Biosystems Engineering': ['Farm machinery / equipment assistance', 'Irrigation / water system assistance', 'Post-harvest facility / structure assistance', 'Project inspection / validation', 'Repair / maintenance / safety concern', 'Engineering measurement / design / compliance']
 };
 const nonRatedAccomplishmentTypes = ['Absent', 'Leave', 'Official Travel'];
-const sharedTaReportRubric = [
-  {
-    label: 'Dates checked and current period covered',
-    stages: allCropStages,
-    detect: (plan, text) => Boolean(plan.accomplishmentDate || plan.datePlanned || plan.weekStart || /\b(date|week|period|covered|conducted)\b/.test(text))
-  },
-  {
-    label: 'Technical assistance evidence',
-    stages: allCropStages,
-    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(technical assistance|assisted|advised|consultation|field visit|validated|inspection|training)\b/.test(text))
-  },
-  { label: 'Client concern / purpose of assistance', stages: allCropStages, keywords: ['concern', 'request', 'purpose', 'client', 'farmer', 'raiser', 'fisherfolk', 'beneficiary', 'complaint', 'issue'] },
-  { label: 'Challenges / constraints encountered', stages: allCropStages, keywords: ['challenge', 'constraint', 'problem', 'issue', 'concern', 'lack', 'shortage', 'delayed', 'damage', 'difficulty'] },
-  { label: 'Recommendations / interventions / follow-up', stages: allCropStages, keywords: ['recommend', 'recommendation', 'intervention', 'follow-up', 'follow up', 'advised', 'next step', 'action needed', 'solution'] }
-];
-const cropTaReportRubric = [
-  { label: 'Fertilizers / pesticides used', stages: ['Vegetative', 'Reproductive'], keywords: ['fertilizer', 'fertiliser', 'urea', 'complete', '14-14-14', '16-20-0', 'pesticide', 'insecticide', 'herbicide', 'fungicide', 'chemical', 'spray'] },
-  { label: 'Farming practices / strategies', stages: ['Land preparation', 'Seedbed', 'Newly planted', 'Vegetative'], keywords: ['practice', 'strategy', 'method', 'planting', 'spacing', 'transplant', 'direct seeding', 'land preparation', 'cultural management', 'farm management'] },
-  { label: 'Crop variety / seed type and source', stages: ['Seedbed', 'Newly planted'], keywords: ['variety', 'seed', 'hybrid', 'inbred', 'certified seed', 'seed source', 'seedling', 'breed', 'stock'] },
-  { label: 'Soil condition / land preparation', stages: ['Land preparation', 'Newly planted'], keywords: ['soil', 'land preparation', 'plow', 'harrow', 'tillage', 'muddy', 'dry soil', 'soil condition', 'field condition'] },
-  { label: 'Irrigation / water management', stages: ['Land preparation', 'Seedbed', 'Newly planted', 'Vegetative', 'Reproductive'], keywords: ['irrigation', 'water', 'canal', 'pump', 'drainage', 'flooding', 'moisture', 'water management'] },
-  { label: 'Pest and disease incidence / control', stages: ['Seedbed', 'Newly planted', 'Vegetative', 'Reproductive', 'Maturity'], keywords: ['pest', 'disease', 'insect', 'rat', 'bug', 'armyworm', 'stemborer', 'blast', 'bacterial', 'control', 'infestation', 'damage'] },
-  { label: 'Current crop condition / stage of growth', stages: ['Seedbed', 'Newly planted', 'Vegetative', 'Reproductive', 'Maturity'], keywords: ['crop condition', 'condition', 'vegetative', 'flowering', 'tillering', 'booting', 'maturity', 'growth stage', 'healthy', 'stunted'] },
-  { label: 'Estimated yield / comparison', stages: ['Reproductive', 'Maturity', 'Harvesting'], keywords: ['yield', 'estimated production', 'production', 'harvest estimate', 'bags', 'tons', 'cavans', 'comparison', 'compared'] },
-  { label: 'Innovative or best practices observed', stages: ['Vegetative', 'Reproductive', 'Maturity'], keywords: ['innovation', 'innovative', 'best practice', 'good practice', 'improved', 'technology', 'demo', 'adapted'] },
-  { label: 'Harvesting / post-harvest practices', stages: ['Maturity', 'Harvesting'], keywords: ['harvest', 'post-harvest', 'post harvest', 'drying', 'milling', 'storage', 'threshing', 'processing'] },
-  { label: 'Marketing information', stages: ['Marketing'], keywords: ['market', 'price', 'buyer', 'trader', 'selling', 'marketing', 'demand', 'farmgate'] }
-];
-const livestockTaReportRubric = [
-  {
-    label: 'Date, place, and livestock client recorded',
-    detect: (plan, text) => Boolean((plan.accomplishmentDate || plan.datePlanned) && /\b(barangay|farm|backyard|site|client|raiser|owner|beneficiary|association)\b/.test(text))
-  },
-  {
-    label: 'Technical assistance evidence attached or described',
-    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(photo|location|field visit|farm visit|validated|inspected|assisted|advised|consultation)\b/.test(text))
-  },
-  { label: 'Livestock client concern or purpose stated', keywords: ['concern', 'request', 'purpose', 'client', 'raiser', 'owner', 'beneficiary', 'complaint', 'issue', 'mortality', 'sick', 'production'] },
-  { label: 'Animal commodity identified', keywords: ['livestock', 'animal', 'cattle', 'carabao', 'swine', 'hog', 'pig', 'goat', 'poultry', 'chicken', 'duck', 'native chicken', 'layer', 'broiler'] },
-  { label: 'Number of animals and production stage recorded', keywords: ['head', 'heads', 'herd', 'flock', 'breeder', 'grower', 'fattener', 'piglet', 'sow', 'boar', 'calf', 'kid', 'chick', 'laying', 'pregnant', 'lactating', 'production stage'] },
-  { label: 'Health condition and disease signs assessed', keywords: ['health', 'condition', 'disease', 'sick', 'symptom', 'mortality', 'death', 'fever', 'diarrhea', 'wound', 'infection', 'parasite', 'respiratory', 'limping'] },
-  { label: 'Feeds, water, housing, and sanitation checked', keywords: ['feed', 'feeding', 'nutrition', 'forage', 'water', 'housing', 'pen', 'shelter', 'waterer', 'sanitation', 'biosecurity', 'waste', 'cleaning', 'management'] },
-  { label: 'Vaccination, treatment, or veterinary referral advised', keywords: ['vaccine', 'vaccination', 'treatment', 'deworm', 'medicine', 'antibiotic', 'vitamins', 'veterinary', 'vet', 'referral', 'quarantine', 'isolate', 'medication'] },
-  { label: 'Livestock constraints or risk factors noted', keywords: ['challenge', 'constraint', 'problem', 'issue', 'lack', 'shortage', 'delayed', 'damage', 'difficulty', 'risk', 'biosecurity', 'outbreak'] },
-  { label: 'Livestock recommendation or follow-up action stated', keywords: ['recommend', 'recommendation', 'advised', 'follow-up', 'follow up', 'next visit', 'monitor', 'return visit', 'coordinate', 'action needed'] }
-];
-const fisheryTaReportRubric = [
-  {
-    label: 'Date, place, and fishery client recorded',
-    detect: (plan, text) => Boolean((plan.accomplishmentDate || plan.datePlanned) && /\b(barangay|coastal|pond|river|lake|landing|site|client|fisherfolk|operator|beneficiary|association)\b/.test(text))
-  },
-  {
-    label: 'Technical assistance evidence attached or described',
-    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(photo|location|field visit|site visit|validated|inspected|assisted|advised|consultation)\b/.test(text))
-  },
-  { label: 'Fishery client concern or purpose stated', keywords: ['concern', 'request', 'purpose', 'client', 'fisherfolk', 'operator', 'beneficiary', 'complaint', 'issue', 'production', 'registration'] },
-  { label: 'Fishery commodity or fishing activity identified', keywords: ['fish', 'fishery', 'tilapia', 'bangus', 'milkfish', 'shrimp', 'crab', 'aquaculture', 'capture', 'fishing', 'fisherfolk', 'seaweed', 'shellfish'] },
-  { label: 'Culture system, gear, boat, or site described', keywords: ['pond', 'cage', 'pen', 'hatchery', 'coastal', 'river', 'lake', 'gear', 'net', 'hook', 'boat', 'banca', 'site', 'landing', 'culture system'] },
-  { label: 'Water or habitat condition assessed', keywords: ['water', 'salinity', 'oxygen', 'dissolved oxygen', 'ph', 'turbidity', 'algae', 'temperature', 'habitat', 'siltation', 'pollution', 'water quality'] },
-  { label: 'Stocking, feeding, or production practice checked', keywords: ['stocking', 'fingerling', 'fry', 'feed', 'feeding', 'sampling', 'growth', 'harvest', 'culture management', 'production practice', 'survival'] },
-  { label: 'Fish health, losses, or regulatory concern noted', keywords: ['fish kill', 'disease', 'mortality', 'loss', 'damage', 'illegal', 'registration', 'license', 'permit', 'compliance', 'closed season', 'ordinance'] },
-  { label: 'Fishery constraints or risk factors noted', keywords: ['challenge', 'constraint', 'problem', 'issue', 'lack', 'shortage', 'delayed', 'damage', 'difficulty', 'risk', 'pollution', 'weather'] },
-  { label: 'Fishery recommendation or follow-up action stated', keywords: ['recommend', 'recommendation', 'advised', 'follow-up', 'follow up', 'next visit', 'monitor', 'coordinate', 'action needed', 'referral'] }
-];
-const biosystemsTaReportRubric = [
-  {
-    label: 'Date, site, and engineering client recorded',
-    detect: (plan, text) => Boolean((plan.accomplishmentDate || plan.datePlanned) && /\b(barangay|site|location|client|beneficiary|operator|contractor|association|recipient|project)\b/.test(text))
-  },
-  {
-    label: 'Technical assistance evidence attached or described',
-    detect: (plan, text) => Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || /\b(photo|location|site visit|inspection|validated|tested|assisted|advised|consultation)\b/.test(text))
-  },
-  { label: 'Engineering concern or purpose stated', keywords: ['concern', 'request', 'purpose', 'client', 'beneficiary', 'operator', 'contractor', 'issue', 'inspection', 'validation', 'repair', 'maintenance'] },
-  { label: 'Project, equipment, facility, or system identified', keywords: ['project', 'equipment', 'facility', 'machinery', 'machine', 'irrigation', 'greenhouse', 'dryer', 'post-harvest', 'structure', 'system', 'solar', 'pump', 'engine'] },
-  { label: 'Site location, beneficiary, operator, or contractor recorded', keywords: ['site', 'location', 'beneficiary', 'operator', 'contractor', 'association', 'client', 'recipient', 'barangay', 'owner', 'cooperator'] },
-  { label: 'Technical condition, progress, or operation assessed', keywords: ['condition', 'progress', 'operation', 'operational', 'functioning', 'inspection', 'validation', 'testing', 'commissioning', 'status', 'performance'] },
-  { label: 'Defect, repair, maintenance, or safety issue noted', keywords: ['defect', 'damage', 'repair', 'maintenance', 'calibration', 'safety', 'hazard', 'leak', 'broken', 'malfunction', 'replacement', 'corrective'] },
-  { label: 'Measurement, specification, design, or compliance checked', keywords: ['measurement', 'measure', 'specification', 'design', 'dimension', 'capacity', 'horsepower', 'flow rate', 'compliance', 'standard', 'plan', 'layout'] },
-  { label: 'Engineering constraints or implementation issue noted', keywords: ['challenge', 'constraint', 'problem', 'issue', 'lack', 'shortage', 'delayed', 'damage', 'difficulty', 'risk', 'access', 'materials'] },
-  { label: 'Engineering recommendation or action required stated', keywords: ['engineering', 'recommend', 'recommendation', 'action', 'required', 'follow-up', 'follow up', 'correction', 'coordinate', 'technical advice', 'next step'] }
-];
+const taClients = ['Individual Farmer', 'Fisherfolk', 'Livestock Raiser', 'Cooperative', 'Farmers Association', 'Barangay', 'School', 'Private Organization', 'National Government Agency', 'LGU Office'];
+const taProgramCatalog = {
+  Rice: [
+    taItem('Basic consultation/advisory', 1, ['consultation', 'advisory', 'advice']),
+    taItem('Farm visitation', 2, ['farm visit', 'field visit']),
+    taItem('Fertilizer recommendation', 2),
+    taItem('Variety recommendation', 2),
+    taItem('Pest identification', 2),
+    taItem('Disease diagnosis', 3),
+    taItem('Nutrient deficiency diagnosis', 3),
+    taItem('Crop stage assessment', 2),
+    taItem('Yield estimation', 3),
+    taItem('Damage assessment', 4),
+    taItem('Rice crop monitoring', 2),
+    taItem('RSBSA validation', 3, ['rsbsa']),
+    taItem('Seed inspection assistance', 4),
+    taItem('Crop cutting assistance', 3),
+    taItem('Hybrid rice orientation', 3),
+    taItem('Climate advisory', 2),
+    taItem('GIS mapping assistance', 5, ['gis mapping', 'mapping']),
+    taItem('Preparation of technical reports', 4, ['technical report']),
+    taItem('Technology demonstration', 5, ['techno demo', 'demo']),
+    taItem('Farmer coaching/mentoring', 4, ['coaching', 'mentoring'])
+  ],
+  HVCC: [
+    taItem('Vegetable production advisory', 1),
+    taItem('Orchard management advisory', 2),
+    taItem('Soil fertility recommendation', 2),
+    taItem('Pest identification', 2),
+    taItem('Disease diagnosis', 3),
+    taItem('Fertigation recommendation', 3),
+    taItem('Pruning recommendation', 3),
+    taItem('Crop establishment planning', 3),
+    taItem('Protected cultivation assistance', 4),
+    taItem('Nursery management', 3),
+    taItem('GAP technical assistance', 5, ['gap']),
+    taItem('Organic farming advisory', 4),
+    taItem('Crop damage validation', 4),
+    taItem('Production monitoring', 2),
+    taItem('Technology demonstration', 5, ['techno demo', 'demo']),
+    taItem('Farmer Field School assistance', 5, ['ffs', 'farmer field school'])
+  ],
+  Corn: [
+    taItem('Corn production advisory', 1),
+    taItem('Variety recommendation', 2),
+    taItem('Fertilizer recommendation', 2),
+    taItem('Weed management advisory', 2),
+    taItem('Pest diagnosis', 3),
+    taItem('Disease diagnosis', 3),
+    taItem('Crop monitoring', 2),
+    taItem('Yield estimation', 3),
+    taItem('Damage assessment', 4),
+    taItem('Technology demonstration', 5, ['techno demo', 'demo']),
+    taItem('Production planning', 3),
+    taItem('Harvest management', 2)
+  ],
+  Livestock: [
+    taItem('Livestock production advisory', 1),
+    taItem('Housing recommendation', 2),
+    taItem('Feeding recommendation', 2),
+    taItem('Breeding advisory', 3),
+    taItem('Animal health consultation', 3),
+    taItem('Disease investigation', 4),
+    taItem('Biosecurity advisory', 4),
+    taItem('ASF surveillance assistance', 5, ['asf']),
+    taItem('Farm inspection', 3),
+    taItem('Farm profiling', 2),
+    taItem('Livestock inventory validation', 3),
+    taItem('Swine recovery technical assistance', 5),
+    taItem('Goat/Cattle production advisory', 3, ['goat production', 'cattle production']),
+    taItem('Poultry management', 2),
+    taItem('Animal waste management', 3),
+    taItem('Farm planning', 4)
+  ],
+  Fishery: [
+    taItem('Fish culture advisory', 1),
+    taItem('Pond preparation', 2),
+    taItem('Water quality assessment', 4),
+    taItem('Feeding recommendation', 2),
+    taItem('Disease diagnosis', 4),
+    taItem('Fish kill investigation', 5),
+    taItem('Cage culture advisory', 3),
+    taItem('Aquaculture monitoring', 3),
+    taItem('Hatchery assistance', 4),
+    taItem('Seaweed production advisory', 3),
+    taItem('Capture fisheries advisory', 2),
+    taItem('Fisheries registration assistance', 2),
+    taItem('Fishpond engineering recommendation', 4),
+    taItem('Resource assessment', 5)
+  ],
+  'Biosystems Engineering': [
+    taItem('Farm mechanization advisory', 2),
+    taItem('Machinery troubleshooting', 4),
+    taItem('Equipment calibration', 4),
+    taItem('Irrigation assessment', 4),
+    taItem('Drainage assessment', 4),
+    taItem('Farm structure recommendation', 4),
+    taItem('Swine facility assessment', 5),
+    taItem('Greenhouse planning', 5),
+    taItem('Land development planning', 5),
+    taItem('GIS mapping', 5, ['gis']),
+    taItem('GPS survey', 5, ['gps']),
+    taItem('Engineering estimates', 5),
+    taItem('Technical drawing/layout', 5, ['technical drawing', 'layout']),
+    taItem('Farm road assessment', 4),
+    taItem('Water system planning', 5)
+  ]
+};
 const reportGuides = {
-  crop: 'For crop technical assistance, include the current crop stage, crop condition, field/site observation, inputs or practices observed, client concern, assistance given, constraints, recommendation, and follow-up.',
-  Livestock: 'For livestock technical assistance, include the animal commodity, number of animals, production stage, health signs or mortality concern, feeds/water/housing/sanitation observation, client concern, assistance given, constraints, recommendation, and follow-up.',
-  Fishery: 'For fishery technical assistance, include the commodity or fishing activity, culture system/gear/site, water or habitat condition, stocking/feeding/production practice, fish health/losses or regulatory concern, assistance given, constraints, recommendation, and follow-up.',
-  'Biosystems Engineering': 'For biosystems engineering technical assistance, include the project/equipment/facility, site and beneficiary/operator/contractor, technical condition or progress, defects/repair/safety issues, measurements/specifications/compliance, action required, and follow-up.'
+  crop: 'Technical Assistance means professional advice, field diagnosis, demonstration, planning, inspection, validation, mentoring, monitoring, troubleshooting, and other extension interventions for crops. Select or describe the TA activity performed; the system detects the matching crop TA grade.',
+  Livestock: 'Technical Assistance means professional advice, diagnosis, inspection, validation, mentoring, monitoring, farm planning, surveillance, and other extension interventions for livestock raisers. The system detects the matching livestock TA grade.',
+  Fishery: 'Technical Assistance means professional advice, assessment, diagnosis, monitoring, engineering recommendation, registration assistance, and other extension interventions for fisherfolk and fishery clients. The system detects the matching fishery TA grade.',
+  'Biosystems Engineering': 'Technical Assistance means engineering advice, inspection, validation, troubleshooting, planning, estimates, drawings, mapping, surveys, and other interventions for agricultural engineering practices. The system detects the matching biosystems engineering TA grade.'
 };
 const storageKey = 'weekly-itinerary-accomplishment-monitor-v1';
 const staffStorageKey = 'weekly-accomplishment-staff-v1';
@@ -362,6 +388,20 @@ function normalizedReportText(plan) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
+function taItem(label, grade, extraKeywords = []) {
+  const words = label
+    .toLowerCase()
+    .replace(/[()/]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 3 && !['technical', 'assistance', 'recommendation', 'advisory', 'management'].includes(word));
+  return {
+    label,
+    grade,
+    keywords: [...new Set([label.toLowerCase(), ...extraKeywords.map((keyword) => keyword.toLowerCase())])],
+    words
+  };
+}
+
 function systemDetectsTechnicalAssistance(plan) {
   if (isNonRatedOfficialStatus(plan)) return false;
   const text = normalizedReportText(plan);
@@ -386,8 +426,8 @@ function cropStageFor(plan) {
 }
 
 function serviceCategoryFor(plan) {
-  if (isCropProgram(plan.program)) return cropStageFor(plan);
-  const options = serviceCategoryOptions[plan.program] || ['General technical assistance'];
+  const catalogOptions = (taProgramCatalog[plan.program] || []).map((item) => item.label);
+  const options = catalogOptions.length ? catalogOptions : serviceCategoryOptions[plan.program] || serviceCategoryOptions.crop;
   return options.includes(plan.cropStage) ? plan.cropStage : options[0];
 }
 
@@ -404,23 +444,12 @@ function uniqueRubricItems(items) {
 }
 
 function applicableReportItems(plan) {
-  const stage = cropStageFor(plan);
-  let programItems = cropTaReportRubric;
-  if (plan.program === 'Livestock') programItems = livestockTaReportRubric;
-  if (plan.program === 'Fishery') programItems = fisheryTaReportRubric;
-  if (plan.program === 'Biosystems Engineering') programItems = biosystemsTaReportRubric;
-  if (isCropProgram(plan.program)) {
-    const cropItems = stage === 'Not crop-specific'
-      ? cropTaReportRubric
-      : cropTaReportRubric.filter((item) => !item.stages || item.stages.includes(stage));
-    return uniqueRubricItems([...sharedTaReportRubric, ...cropItems]);
-  }
-  return uniqueRubricItems(programItems);
+  return uniqueRubricItems(taProgramCatalog[plan.program] || []);
 }
 
 function technicalAssistanceCategory(plan) {
   if (!technicalAssistanceApplies(plan)) return 'Not graded under technical-assistance checklist';
-  if (isCropProgram(plan.program)) return `Crop stage: ${cropStageFor(plan)}`;
+  if (isCropProgram(plan.program)) return `${plan.program} technical assistance: ${serviceCategoryFor(plan)}`;
   if (plan.program === 'Livestock') return `Livestock technical assistance: ${serviceCategoryFor(plan)}`;
   if (plan.program === 'Fishery') return `Fishery technical assistance: ${serviceCategoryFor(plan)}`;
   if (plan.program === 'Biosystems Engineering') return `Biosystems engineering technical assistance: ${serviceCategoryFor(plan)}`;
@@ -428,29 +457,35 @@ function technicalAssistanceCategory(plan) {
 }
 
 function programChecklistTitle(program) {
-  if (isCropProgram(program)) return `${program} Crop Technical Assistance Checklist`;
+  if (isCropProgram(program)) return `${program} Program Technical Assistance Checklist`;
   if (program === 'Livestock') return 'Livestock Technical Assistance Checklist';
-  if (program === 'Fishery') return 'Fishery Technical Assistance Checklist';
+  if (program === 'Fishery') return 'Fisheries Technical Assistance Checklist';
   if (program === 'Biosystems Engineering') return 'Biosystems Engineering Technical Assistance Checklist';
   return 'Technical Assistance Checklist';
 }
 
 function detectedReportItems(plan) {
+  return detectedReportItemObjects(plan).map((item) => item.label);
+}
+
+function detectedReportItemObjects(plan) {
   if (!technicalAssistanceApplies(plan)) return [];
   const text = normalizedReportText(plan);
   return applicableReportItems(plan)
     .filter((item) => {
       if (item.detect) return item.detect(plan, text);
-      return item.keywords.some((keyword) => text.includes(keyword));
-    })
-    .map((item) => item.label);
+      if (item.keywords.some((keyword) => text.includes(keyword))) return true;
+      const matchedWords = item.words.filter((word) => text.includes(word));
+      return matchedWords.length >= Math.min(2, item.words.length);
+    });
 }
 
 function reportGrade(plan) {
   if (!technicalAssistanceApplies(plan)) return null;
-  const checkedItems = detectedReportItems(plan).length;
-  const applicableItems = applicableReportItems(plan).length || sharedTaReportRubric.length;
-  return Math.round((checkedItems / applicableItems) * 100);
+  const detected = detectedReportItemObjects(plan);
+  if (!detected.length) return 0;
+  const highestGrade = Math.max(...detected.map((item) => Number(item.grade || 0)));
+  return Math.round((highestGrade / 5) * 100);
 }
 
 function reportGradeClass(grade) {
@@ -464,7 +499,10 @@ function reportGradeClass(grade) {
 function reportGradeText(plan) {
   const grade = reportGrade(plan);
   if (grade === null || grade === undefined) return 'N/A';
-  return `${grade}%`;
+  const detected = detectedReportItemObjects(plan);
+  if (!detected.length) return '0% (No TA activity detected)';
+  const highestGrade = Math.max(...detected.map((item) => Number(item.grade || 0)));
+  return `Grade ${highestGrade}/5 (${grade}%)`;
 }
 
 function plusFactorFor(plan) {
@@ -1250,7 +1288,7 @@ function updateReportGradePreview() {
   if (els.autoChecklistPreview) {
     els.autoChecklistPreview.innerHTML = applicable.map((item) => {
       const matched = detected.includes(item.label);
-      return `<span class="${matched ? 'detected' : 'missing'}">${matched ? 'Detected' : 'Missing'}: ${escapeHtml(item.label)}</span>`;
+      return `<span class="${matched ? 'detected' : 'missing'}">${matched ? 'Detected' : 'Not detected'}: ${escapeHtml(item.label)} - Grade ${escapeHtml(item.grade)}</span>`;
     }).join('');
   }
 }
@@ -1260,18 +1298,16 @@ function updateProgramReportUi(program) {
   const reportGuide = cropProgram ? reportGuides.crop : reportGuides[program] || reportGuides.crop;
   const title = programChecklistTitle(program);
   if (els.autoChecklistHeading) els.autoChecklistHeading.textContent = title;
-  if (els.taProgramBasis) els.taProgramBasis.textContent = `Grading basis: ${title}`;
+  if (els.taProgramBasis) els.taProgramBasis.textContent = `Grading basis: ${title} - highest detected TA activity grade is used.`;
   if (els.reportDetails) els.reportDetails.placeholder = 'Write the technical assistance report details here. Follow the program-specific guide below.';
   if (els.reportDetailsGuide) els.reportDetailsGuide.textContent = reportGuide;
 }
 
 function updateServiceCategoryOptions(program, selectedValue = '') {
   if (!els.cropStage) return;
-  const cropProgram = isCropProgram(program);
-  const options = cropProgram
-    ? serviceCategoryOptions.crop
-    : serviceCategoryOptions[program] || ['General technical assistance'];
-  els.serviceCategoryLabel.textContent = cropProgram ? 'Crop Stage' : 'Service Category';
+  const catalogOptions = (taProgramCatalog[program] || []).map((item) => item.label);
+  const options = catalogOptions.length ? catalogOptions : ['General technical assistance'];
+  els.serviceCategoryLabel.textContent = 'TA Activity / Service Category';
   updateProgramReportUi(program);
   els.cropStage.innerHTML = '';
   options.forEach((option) => els.cropStage.add(new Option(option, option)));
@@ -1730,7 +1766,7 @@ function exportCsv() {
     ['Week Start', els.weekStart.value],
     ['Week End', els.weekEnd.value],
     [],
-    ['Staff', 'Planned Date', 'Program', 'Work Type', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'Crop Stage / Service Category', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Plus Factor', 'Adjusted Score', 'Latitude', 'Longitude', 'Justification / Boss Instruction / Official Status Details', 'Technical / Operational Details', 'Applicable Checklist Count', 'System Detected Checklist', 'TA Report Grade', 'Rating Effect'],
+    ['Staff', 'Planned Date', 'Program', 'Work Type', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'TA Activity / Service Category', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Plus Factor', 'Adjusted Score', 'Latitude', 'Longitude', 'Justification / Boss Instruction / Official Status Details', 'Technical / Operational Details', 'Applicable TA Count', 'System Detected TA', 'TA Report Grade', 'Rating Effect'],
     ...filteredPlans().map((plan) => [
       plan.staffName,
       plan.datePlanned,
