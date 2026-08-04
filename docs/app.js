@@ -152,10 +152,10 @@ const taProgramCatalog = {
   ]
 };
 const reportGuides = {
-  crop: 'Technical Assistance means professional advice, field diagnosis, demonstration, planning, inspection, validation, mentoring, monitoring, troubleshooting, and other extension interventions for crops. Select or describe the TA activity performed; the system detects the matching crop TA grade.',
-  Livestock: 'Technical Assistance means professional advice, diagnosis, inspection, validation, mentoring, monitoring, farm planning, surveillance, and other extension interventions for livestock raisers. The system detects the matching livestock TA grade.',
-  Fishery: 'Technical Assistance means professional advice, assessment, diagnosis, monitoring, engineering recommendation, registration assistance, and other extension interventions for fisherfolk and fishery clients. The system detects the matching fishery TA grade.',
-  'Biosystems Engineering': 'Technical Assistance means engineering advice, inspection, validation, troubleshooting, planning, estimates, drawings, mapping, surveys, and other interventions for agricultural engineering practices. The system detects the matching biosystems engineering TA grade.'
+  crop: 'Technical Assistance means professional advice, field diagnosis, demonstration, planning, inspection, validation, mentoring, monitoring, troubleshooting, and other extension interventions for crops. The grade is based on how complete the report is for the conducted target task.',
+  Livestock: 'Technical Assistance means professional advice, diagnosis, inspection, validation, mentoring, monitoring, farm planning, surveillance, and other extension interventions for livestock raisers. The grade is based on how complete the report is for the conducted target task.',
+  Fishery: 'Technical Assistance means professional advice, assessment, diagnosis, monitoring, engineering recommendation, registration assistance, and other extension interventions for fisherfolk and fishery clients. The grade is based on how complete the report is for the conducted target task.',
+  'Biosystems Engineering': 'Technical Assistance means engineering advice, inspection, validation, troubleshooting, planning, estimates, drawings, mapping, surveys, and other interventions for agricultural engineering practices. The grade is based on how complete the report is for the conducted target task.'
 };
 const storageKey = 'weekly-itinerary-accomplishment-monitor-v1';
 const staffStorageKey = 'weekly-accomplishment-staff-v1';
@@ -439,7 +439,7 @@ function taItemMatches(item, text) {
 
 function detectedCatalogItems(plan) {
   const text = normalizedReportText(plan);
-  return applicableReportItems(plan).filter((item) => taItemMatches(item, text));
+  return catalogReportItems(plan).filter((item) => taItemMatches(item, text));
 }
 
 function systemDetectsTechnicalAssistance(plan) {
@@ -485,8 +485,69 @@ function uniqueRubricItems(items) {
   return [...byLabel.values()];
 }
 
-function applicableReportItems(plan) {
+function catalogReportItems(plan) {
   return uniqueRubricItems(taProgramCatalog[plan.program] || []);
+}
+
+function textHasAny(text, words) {
+  return words.some((word) => text.includes(word));
+}
+
+function reportCompletenessItems(plan) {
+  const text = normalizedReportText(plan);
+  const details = String(plan.reportDetails || '').trim();
+  const output = String(plan.accomplishmentOutput || '').trim();
+  const detectedServices = detectedCatalogItems(plan);
+  const serviceCategory = serviceCategoryFor(plan);
+  const hasServiceCategory = serviceCategory && !['Not crop-specific', 'General technical assistance'].includes(serviceCategory);
+  const hasEvidence = Boolean(plan.taPhotoData || plan.taLatitude || plan.taLongitude || textHasAny(text, ['photo', 'picture', 'location', 'gps', 'evidence', 'field validation']));
+  const hasNoConstraintStatement = /\b(no problem|no issue|no constraint|none observed|no challenge|not applicable|n\/a)\b/.test(text);
+  return [
+    {
+      label: 'Actual date or reporting period is clear',
+      matched: Boolean(plan.accomplishmentDate || plan.datePlanned || textHasAny(text, ['date', 'week', 'period', 'conducted on']))
+    },
+    {
+      label: 'Target task or TA service conducted is identified',
+      matched: Boolean(output.length >= 8 || detectedServices.length || (hasServiceCategory && text.includes(serviceCategory.toLowerCase())))
+    },
+    {
+      label: 'Client or beneficiary is identified',
+      matched: Boolean(String(plan.clients || '').trim() || /\b(client|farmer|fisherfolk|raiser|cooperative|association|barangay|school|beneficiary)\b/.test(text))
+    },
+    {
+      label: 'Place, farm, field, pond, facility, or project site is identified',
+      matched: Boolean(String(plan.place || '').trim() || /\b(place|site|farm|field|pond|facility|barangay|project area|location)\b/.test(text))
+    },
+    {
+      label: 'Commodity, program, crop stage, animal/fishery item, or engineering concern is described',
+      matched: Boolean(plan.program || hasServiceCategory || /\b(rice|corn|vegetable|hvcc|crop stage|livestock|swine|goat|cattle|poultry|fish|pond|aquaculture|machinery|irrigation|drainage|facility|engineering)\b/.test(text))
+    },
+    {
+      label: 'Observation, condition, concern, diagnosis, or assessment is stated',
+      matched: /\b(observed|observation|condition|concern|issue|problem|diagnosis|assessed|assessment|inspection|validated|monitoring|damage|pest|disease|health|water quality|equipment|soil|growth|mortality)\b/.test(text)
+    },
+    {
+      label: 'Assistance, advice, action taken, or intervention is stated',
+      matched: /\b(assisted|assistance|advised|advice|recommended|provided|conducted|validated|inspected|demonstrated|trained|coached|oriented|referred|prepared|mapped|surveyed|calibrated|troubleshot|monitored)\b/.test(text)
+    },
+    {
+      label: 'Evidence or field location is attached or stated',
+      matched: hasEvidence
+    },
+    {
+      label: 'Constraints, challenges, or no-constraint statement is included',
+      matched: Boolean(hasNoConstraintStatement || /\b(constraint|challenge|problem|issue|limitation|delayed|unavailable|lack|shortage|weather|flood|pest|disease|mortality|damage|not available)\b/.test(text))
+    },
+    {
+      label: 'Recommendation, next step, or follow-up action is stated',
+      matched: /\b(recommend|recommendation|follow-up|follow up|next step|action plan|advised to|for monitoring|monitor again|schedule|return visit|intervention|refer|referral)\b/.test(text)
+    }
+  ];
+}
+
+function applicableReportItems(plan) {
+  return reportCompletenessItems(plan);
 }
 
 function technicalAssistanceCategory(plan) {
@@ -512,15 +573,16 @@ function detectedReportItems(plan) {
 
 function detectedReportItemObjects(plan) {
   if (!technicalAssistanceApplies(plan)) return [];
-  return detectedCatalogItems(plan);
+  return applicableReportItems(plan).filter((item) => item.matched);
 }
 
 function reportGrade(plan) {
+  if (!plan.accomplishmentType) return null;
   if (!technicalAssistanceApplies(plan)) return null;
+  const applicable = applicableReportItems(plan);
+  if (!applicable.length) return 0;
   const detected = detectedReportItemObjects(plan);
-  if (!detected.length) return 0;
-  const highestGrade = Math.max(...detected.map((item) => Number(item.grade || 0)));
-  return Math.round((highestGrade / 5) * 100);
+  return Math.round((detected.length / applicable.length) * 100);
 }
 
 function reportGradeClass(grade) {
@@ -535,9 +597,9 @@ function reportGradeText(plan) {
   const grade = reportGrade(plan);
   if (grade === null || grade === undefined) return 'N/A';
   const detected = detectedReportItemObjects(plan);
-  if (!detected.length) return '0% (No TA activity detected)';
-  const highestGrade = Math.max(...detected.map((item) => Number(item.grade || 0)));
-  return `Grade ${highestGrade}/5 (${grade}%)`;
+  const applicable = applicableReportItems(plan);
+  if (!detected.length) return '0% (Report details incomplete)';
+  return `${grade}% (${detected.length}/${applicable.length} complete)`;
 }
 
 function plusFactorFor(plan) {
@@ -1327,7 +1389,7 @@ function updateReportGradePreview() {
   if (els.autoChecklistPreview) {
     els.autoChecklistPreview.innerHTML = applicable.map((item) => {
       const matched = detected.includes(item.label);
-      return `<span class="${matched ? 'detected' : 'missing'}">${matched ? 'Detected' : 'Not detected'}: ${escapeHtml(item.label)} - Grade ${escapeHtml(item.grade)}</span>`;
+      return `<span class="${matched ? 'detected' : 'missing'}">${matched ? 'Complete' : 'Missing'}: ${escapeHtml(item.label)}</span>`;
     }).join('');
   }
 }
@@ -1337,7 +1399,7 @@ function updateProgramReportUi(program) {
   const reportGuide = cropProgram ? reportGuides.crop : reportGuides[program] || reportGuides.crop;
   const title = programChecklistTitle(program);
   if (els.autoChecklistHeading) els.autoChecklistHeading.textContent = title;
-  if (els.taProgramBasis) els.taProgramBasis.textContent = `Grading basis: ${title} - highest detected TA activity grade is used.`;
+  if (els.taProgramBasis) els.taProgramBasis.textContent = `Grading basis: completeness of report information for the conducted target task.`;
   if (els.reportDetails) els.reportDetails.placeholder = 'Write the technical assistance report details here. Follow the program-specific guide below.';
   if (els.reportDetailsGuide) els.reportDetailsGuide.textContent = reportGuide;
 }
