@@ -2125,7 +2125,7 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   pdfLine(content, reportInfoX, y - 3, reportInfoX + reportInfoWidth, y - 3);
   y -= 34;
   wrapPdfText('The following tasks have been accomplished on the following days:', reportInfoWidth, 10)
-    .forEach((line, index) => pdfText(content, line, reportInfoCenter, y - (index * 12), 10, { align: 'center' }));
+    .forEach((line, index) => pdfText(content, line, reportInfoX, y - (index * 12), 10));
   y -= 22;
 
   const columns = [
