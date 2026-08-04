@@ -1,4 +1,4 @@
-const cacheName = 'mao-weekly-report-v29';
+const cacheName = 'mao-weekly-report-v30';
 const appFiles = [
   './',
   './index.html',
