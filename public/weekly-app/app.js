@@ -228,6 +228,7 @@ const els = {
   accomplishmentOutput: document.querySelector('#accomplishmentOutput'),
   accomplishmentJustification: document.querySelector('#accomplishmentJustification'),
   accomplishmentTechnicalAssistance: document.querySelector('#accomplishmentTechnicalAssistance'),
+  taProgramBasis: document.querySelector('#taProgramBasis'),
   taPhotoInput: document.querySelector('#taPhotoInput'),
   captureLocationBtn: document.querySelector('#captureLocationBtn'),
   locationStatus: document.querySelector('#locationStatus'),
@@ -1240,7 +1241,7 @@ function updateReportGradePreview() {
     taLongitude: els.locationStatus.dataset.lng || '',
     taPhotoData: els.taPhotoPreview.dataset.photoData || ''
   };
-  if (els.autoChecklistHeading) els.autoChecklistHeading.textContent = programChecklistTitle(selectedProgram);
+  updateProgramReportUi(selectedProgram);
   setTechnicalAssistanceIndicator(els.accomplishmentTechnicalAssistance, technicalAssistanceApplies(tempPlan));
   const detected = detectedReportItems(tempPlan);
   const applicable = applicableReportItems(tempPlan);
@@ -1254,6 +1255,16 @@ function updateReportGradePreview() {
   }
 }
 
+function updateProgramReportUi(program) {
+  const cropProgram = isCropProgram(program);
+  const reportGuide = cropProgram ? reportGuides.crop : reportGuides[program] || reportGuides.crop;
+  const title = programChecklistTitle(program);
+  if (els.autoChecklistHeading) els.autoChecklistHeading.textContent = title;
+  if (els.taProgramBasis) els.taProgramBasis.textContent = `Grading basis: ${title}`;
+  if (els.reportDetails) els.reportDetails.placeholder = 'Write the technical assistance report details here. Follow the program-specific guide below.';
+  if (els.reportDetailsGuide) els.reportDetailsGuide.textContent = reportGuide;
+}
+
 function updateServiceCategoryOptions(program, selectedValue = '') {
   if (!els.cropStage) return;
   const cropProgram = isCropProgram(program);
@@ -1261,9 +1272,7 @@ function updateServiceCategoryOptions(program, selectedValue = '') {
     ? serviceCategoryOptions.crop
     : serviceCategoryOptions[program] || ['General technical assistance'];
   els.serviceCategoryLabel.textContent = cropProgram ? 'Crop Stage' : 'Service Category';
-  const reportGuide = cropProgram ? reportGuides.crop : reportGuides[program] || reportGuides.crop;
-  els.reportDetails.placeholder = reportGuide;
-  if (els.reportDetailsGuide) els.reportDetailsGuide.textContent = reportGuide;
+  updateProgramReportUi(program);
   els.cropStage.innerHTML = '';
   options.forEach((option) => els.cropStage.add(new Option(option, option)));
   els.cropStage.value = options.includes(selectedValue) ? selectedValue : options[0];
