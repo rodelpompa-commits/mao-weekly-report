@@ -2149,8 +2149,8 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   y = Math.min(y - 34, 102);
   const leftX = margin;
   const rightX = 338;
-  pdfText(content, 'Prepared by:', leftX, y + 42, 9);
-  pdfText(content, 'Reviewed by:', rightX, y + 42, 9);
+  pdfText(content, 'Prepared by:', leftX + 100, y + 42, 9, { align: 'center' });
+  pdfText(content, 'Reviewed by:', rightX + 100, y + 42, 9, { align: 'center' });
   pdfLine(content, leftX, y + 8, leftX + 200, y + 8);
   pdfLine(content, rightX, y + 8, rightX + 200, y + 8);
   pdfText(content, group.name.toUpperCase(), leftX + 100, y + 15, 9, { align: 'center' });
