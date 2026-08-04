@@ -1,4 +1,4 @@
-const cacheName = 'mao-weekly-report-v24';
+const cacheName = 'mao-weekly-report-v25';
 const appFiles = [
   './',
   './index.html',
@@ -6,7 +6,8 @@ const appFiles = [
   './styles.css',
   './manifest.webmanifest',
   './pinamalayan-boundary.json',
-  './icons/mao-weekly-icon.svg'
+  './icons/mao-weekly-icon.svg',
+  './images/office-letterhead.png'
 ];
 
 self.addEventListener('install', (event) => {
