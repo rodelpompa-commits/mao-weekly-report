@@ -953,10 +953,7 @@ async function initializeSharedState() {
 
     applyingSharedState = true;
     if (hasSharedStateData(remoteState)) {
-      const mergedPlans = mergePlans(remoteState.plans, state.plans);
-      const localAddedRecords = mergedPlans.length > (Array.isArray(remoteState.plans) ? remoteState.plans.length : 0);
-
-      state.plans = mergedPlans;
+      state.plans = Array.isArray(remoteState.plans) ? remoteState.plans : [];
       state.access = { ...defaultAccess, ...(remoteState.access || {}) };
       state.signatories = { ...defaultSignatories, ...(remoteState.signatories || {}) };
       state.staff = Array.isArray(remoteState.staff) && remoteState.staff.length
@@ -966,10 +963,6 @@ async function initializeSharedState() {
       persistSharedStateLocally();
       populateStaffSelects();
       renderAll();
-
-      if (localAddedRecords && state.session.token) {
-        await pushSharedState();
-      }
     } else if (state.session.token) {
       await pushSharedState();
     }
