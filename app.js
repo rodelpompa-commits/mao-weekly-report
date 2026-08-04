@@ -2112,16 +2112,20 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   y -= 20;
   pdfText(content, reportPeriodText(), pageWidth / 2, y, 11, { align: 'center' });
   y -= 34;
-  pdfText(content, 'Name:', pageWidth / 2, y, 10, { align: 'center' });
+  const reportInfoX = 338;
+  const reportInfoWidth = 210;
+  const reportInfoCenter = reportInfoX + (reportInfoWidth / 2);
+  pdfText(content, 'Name:', reportInfoX, y, 10);
   y -= 14;
-  pdfLine(content, pageWidth / 2 - 145, y - 3, pageWidth / 2 + 145, y - 3);
-  pdfText(content, group.name.toUpperCase(), pageWidth / 2, y, 10, { align: 'center' });
+  pdfLine(content, reportInfoX, y - 3, reportInfoX + reportInfoWidth, y - 3);
+  pdfText(content, group.name.toUpperCase(), reportInfoCenter, y, 10, { align: 'center' });
   y -= 24;
-  pdfText(content, 'Position:', pageWidth / 2, y, 10, { align: 'center' });
+  pdfText(content, 'Position:', reportInfoX, y, 10);
   y -= 14;
-  pdfLine(content, pageWidth / 2 - 145, y - 3, pageWidth / 2 + 145, y - 3);
+  pdfLine(content, reportInfoX, y - 3, reportInfoX + reportInfoWidth, y - 3);
   y -= 34;
-  pdfText(content, 'The following tasks have been accomplished on the following days:', pageWidth / 2, y, 10, { align: 'center' });
+  wrapPdfText('The following tasks have been accomplished on the following days:', reportInfoWidth, 10)
+    .forEach((line, index) => pdfText(content, line, reportInfoCenter, y - (index * 12), 10, { align: 'center' }));
   y -= 22;
 
   const columns = [
