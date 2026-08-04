@@ -249,6 +249,7 @@ const els = {
   accomplishmentProgram: document.querySelector('#accomplishmentProgram'),
   accomplishmentType: document.querySelector('#accomplishmentType'),
   accomplishmentPercent: document.querySelector('#accomplishmentPercent'),
+  accomplishmentHours: document.querySelector('#accomplishmentHours'),
   accomplishmentWorkType: document.querySelector('#accomplishmentWorkType'),
   adjustedScorePreview: document.querySelector('#adjustedScorePreview'),
   accomplishmentOutput: document.querySelector('#accomplishmentOutput'),
@@ -1440,9 +1441,11 @@ function syncAccomplishmentStatusControls() {
   const nonRated = nonRatedAccomplishmentTypes.includes(els.accomplishmentType.value);
   if (nonRated) {
     els.accomplishmentPercent.value = 0;
+    els.accomplishmentHours.value = '';
     setTechnicalAssistanceIndicator(els.accomplishmentTechnicalAssistance, false);
   }
   els.accomplishmentPercent.disabled = nonRated;
+  els.accomplishmentHours.disabled = nonRated;
   els.accomplishmentWorkType.disabled = nonRated;
   updateReportGradePreview();
   updateAdjustedScorePreview();
@@ -1683,6 +1686,7 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentProgram.value = target.program || inferProgramFromText(`${target.task || ''} ${target.accomplishmentOutput || ''} ${target.reportDetails || ''}`) || programs[0];
   els.accomplishmentType.value = target.accomplishmentType || (plan ? 'Conducted' : 'Boss Instruction');
   els.accomplishmentPercent.value = target.accomplishmentPercent ?? 100;
+  els.accomplishmentHours.value = target.accomplishmentHours || '';
   els.accomplishmentWorkType.value = target.workType || 'Regular Work';
   els.accomplishmentOutput.value = target.accomplishmentOutput || target.task || '';
   els.accomplishmentJustification.value = target.justification || '';
@@ -1710,6 +1714,7 @@ function hideAccomplishmentForm() {
   els.accomplishmentStaff.disabled = false;
   els.accomplishmentProgram.disabled = false;
   els.accomplishmentPercent.disabled = false;
+  els.accomplishmentHours.disabled = false;
   els.accomplishmentWorkType.disabled = false;
   setLocationStatus('', '', '');
   setPhotoPreview('');
@@ -1737,6 +1742,7 @@ function saveAccomplishment(event) {
   plan.accomplishmentDate = els.accomplishmentDate.value;
   plan.accomplishmentType = type;
   plan.accomplishmentPercent = nonRated ? 0 : Number(els.accomplishmentPercent.value);
+  plan.accomplishmentHours = nonRated ? '' : els.accomplishmentHours.value.trim();
   plan.workType = nonRated ? (plan.workType || 'Regular Work') : els.accomplishmentWorkType.value;
   plan.accomplishmentOutput = els.accomplishmentOutput.value.trim();
   plan.justification = justification;
@@ -1776,6 +1782,7 @@ function removeAccomplishment(plan) {
     delete plan.accomplishmentType;
     delete plan.accomplishmentDate;
     delete plan.accomplishmentPercent;
+    delete plan.accomplishmentHours;
     delete plan.accomplishmentOutput;
     delete plan.justification;
     delete plan.reportDetails;
@@ -1861,7 +1868,7 @@ function exportCsv() {
     ['Week Start', els.weekStart.value],
     ['Week End', els.weekEnd.value],
     [],
-    ['Staff', 'Planned Date', 'Program', 'Work Type', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'TA Activity / Service Category', 'Accomplishment Type', 'Date Conducted', 'Actual Output', 'Performance', 'Plus Factor', 'Adjusted Score', 'Latitude', 'Longitude', 'Justification / Boss Instruction / Official Status Details', 'Technical / Operational Details', 'Applicable TA Count', 'System Detected TA', 'TA Report Grade', 'Rating Effect'],
+    ['Staff', 'Planned Date', 'Program', 'Work Type', 'Planned Task', 'Place', 'Clients', 'Technical Assistance Report', 'TA Activity / Service Category', 'Accomplishment Type', 'Date Conducted', 'Hours / Minutes Rendered', 'Actual Output', 'Performance', 'Plus Factor', 'Adjusted Score', 'Latitude', 'Longitude', 'Justification / Boss Instruction / Official Status Details', 'Technical / Operational Details', 'Applicable TA Count', 'System Detected TA', 'TA Report Grade', 'Rating Effect'],
     ...filteredPlans().map((plan) => [
       plan.staffName,
       plan.datePlanned,
@@ -1874,6 +1881,7 @@ function exportCsv() {
       technicalAssistanceApplies(plan) ? serviceCategoryFor(plan) : '',
       plan.accomplishmentType || '',
       plan.accomplishmentDate || '',
+      plan.accomplishmentHours || '',
       plan.accomplishmentOutput || '',
       isNonRatedOfficialStatus(plan) ? 'Excluded' : plan.accomplishmentPercent === undefined ? '' : `${plan.accomplishmentPercent}%`,
       earnedPlusFactor(plan),
@@ -1983,7 +1991,7 @@ function pdfTaskText(plan) {
 function pdfHoursText(plan) {
   if (!plan.accomplishmentType) return '';
   if (isNonRatedOfficialStatus(plan)) return 'Excluded';
-  return 'Not encoded';
+  return plan.accomplishmentHours || '';
 }
 
 function pdfRemarksText(plan) {
@@ -2041,7 +2049,6 @@ function buildStaffReportPage(group, pageNumber, totalPages) {
   pdfLine(content, margin + 44, y - 3, pageWidth - margin, y - 3);
   y -= 20;
   pdfText(content, 'Position:', margin, y, 10);
-  pdfText(content, state.signatories.preparedByTitle || 'Agricultural Technologist/AEW', margin + 58, y, 10);
   pdfLine(content, margin + 56, y - 3, pageWidth - margin, y - 3);
   y -= 46;
   pdfText(content, 'The following tasks have been accomplished on the following days:', margin, y, 10);
@@ -2099,13 +2106,9 @@ function buildStaffReportPage(group, pageNumber, totalPages) {
   pdfLine(content, leftX, y + 8, leftX + 200, y + 8);
   pdfLine(content, rightX, y + 8, rightX + 200, y + 8);
   pdfText(content, group.name.toUpperCase(), leftX + 100, y + 15, 9, { align: 'center' });
-  pdfText(content, state.signatories.reviewedBy || 'RODEL L. POMPA', rightX + 100, y + 15, 9, { align: 'center' });
+  pdfText(content, 'DANNY S. VILLACRUSIS', rightX + 100, y + 15, 9, { align: 'center' });
   pdfText(content, state.signatories.preparedByTitle || 'Agricultural Technologist/AEW', leftX + 100, y - 5, 8, { align: 'center' });
-  pdfText(content, state.signatories.reviewedByTitle || 'Senior Agriculturist', rightX + 100, y - 5, 8, { align: 'center' });
-  pdfText(content, 'Approved by:', pageWidth / 2, y - 42, 9, { align: 'center' });
-  pdfLine(content, pageWidth / 2 - 100, y - 76, pageWidth / 2 + 100, y - 76);
-  pdfText(content, state.signatories.approvedBy || 'DANNY S. VILLACRUSIS', pageWidth / 2, y - 69, 9, { align: 'center' });
-  pdfText(content, state.signatories.approvedByTitle || 'Municipal Agriculturist', pageWidth / 2, y - 89, 8, { align: 'center' });
+  pdfText(content, 'Municipal Agriculturist', rightX + 100, y - 5, 8, { align: 'center' });
   pdfText(content, `Page ${pageNumber} of ${totalPages}`, pageWidth - margin, 24, 8, { align: 'right' });
   return content.join('\n');
 }
