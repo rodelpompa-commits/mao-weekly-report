@@ -1560,6 +1560,7 @@ function applyAccessRules() {
   els.sessionBadge.textContent = isAdmin() ? 'Admin' : isViewer() ? 'Viewer' : `Staff: ${state.session.staffName || ''}`;
   document.querySelector('#adminBtn').classList.toggle('hidden', !isAdmin());
   document.querySelector('#printBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
+  document.querySelector('#pdfBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
   document.querySelector('#exportBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
   if (deferredInstallPrompt && els.installAppBtn) els.installAppBtn.classList.remove('hidden');
   document.querySelector('[data-view="dashboardView"]').classList.toggle('hidden', !(isAdmin() || isViewer()));
@@ -1899,6 +1900,262 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
+function formatDisplayDate(dateValue, options = {}) {
+  if (!dateValue) return '';
+  const date = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateValue;
+  return date.toLocaleDateString('en-US', {
+    month: options.short ? 'short' : 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function reportPeriodText() {
+  const start = formatDisplayDate(els.weekStart.value);
+  const end = formatDisplayDate(els.weekEnd.value);
+  return start && end ? `${start} to ${end}` : 'Selected Week';
+}
+
+function pdfEscape(value = '') {
+  return String(value)
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+    .replace(/\r?\n/g, ' ');
+}
+
+function wrapPdfText(value, maxWidth, fontSize) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return [''];
+  const approxCharWidth = fontSize * 0.48;
+  const maxChars = Math.max(8, Math.floor(maxWidth / approxCharWidth));
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  words.forEach((word) => {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length > maxChars && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+function pdfLine(content, x1, y1, x2, y2) {
+  content.push(`${x1} ${y1} m ${x2} ${y2} l S`);
+}
+
+function pdfRect(content, x, y, width, height) {
+  content.push(`${x} ${y} ${width} ${height} re S`);
+}
+
+function pdfText(content, text, x, y, size = 10, options = {}) {
+  const align = options.align || 'left';
+  const maxWidth = options.maxWidth || 0;
+  let drawX = x;
+  if (align === 'center') {
+    drawX = x - (String(text).length * size * 0.24);
+  } else if (align === 'right') {
+    drawX = x - (String(text).length * size * 0.48);
+  }
+  if (maxWidth && align === 'left') {
+    const clipped = String(text).length > Math.floor(maxWidth / (size * 0.48))
+      ? `${String(text).slice(0, Math.max(0, Math.floor(maxWidth / (size * 0.48)) - 3))}...`
+      : text;
+    content.push(`BT /F1 ${size} Tf ${drawX} ${y} Td (${pdfEscape(clipped)}) Tj ET`);
+    return;
+  }
+  content.push(`BT /F1 ${size} Tf ${drawX} ${y} Td (${pdfEscape(text)}) Tj ET`);
+}
+
+function pdfTaskText(plan) {
+  const base = plan.accomplishmentOutput || plan.task || '';
+  const details = plan.reportDetails ? ` Details: ${plan.reportDetails}` : '';
+  return `${base}${details}`;
+}
+
+function pdfHoursText(plan) {
+  if (!plan.accomplishmentType) return '';
+  if (isNonRatedOfficialStatus(plan)) return 'Excluded';
+  return 'Not encoded';
+}
+
+function pdfRemarksText(plan) {
+  if (!plan.accomplishmentType) return 'No accomplishment yet';
+  if (plan.accomplishmentType === 'Conducted') {
+    const score = Number(plan.accomplishmentPercent || 0);
+    return score >= 100 ? 'Completed' : `Ongoing / ${score}%`;
+  }
+  if (plan.accomplishmentType === 'Boss Instruction') return 'Boss priority task';
+  if (isNonRatedOfficialStatus(plan)) return plan.accomplishmentType;
+  return plan.justification ? `Justified: ${plan.justification}` : 'Justified not conducted';
+}
+
+function staffGroupsForPdf() {
+  const plans = filteredPlans().sort((a, b) => String(a.datePlanned || '').localeCompare(String(b.datePlanned || '')));
+  const names = isStaff()
+    ? [state.session.staffName]
+    : state.staffFilter === 'All'
+      ? [...new Set(plans.map((plan) => plan.staffName).filter(Boolean))]
+      : [state.staffFilter];
+  return names
+    .filter(Boolean)
+    .map((name) => ({
+      name,
+      plans: plans.filter((plan) => plan.staffName === name)
+    }))
+    .filter((group) => group.plans.length);
+}
+
+function staffReportPagesForPdf() {
+  const maxRowsPerPage = 8;
+  return staffGroupsForPdf().flatMap((group) => {
+    const chunks = [];
+    for (let index = 0; index < group.plans.length; index += maxRowsPerPage) {
+      chunks.push({
+        name: group.name,
+        plans: group.plans.slice(index, index + maxRowsPerPage)
+      });
+    }
+    return chunks;
+  });
+}
+
+function buildStaffReportPage(group, pageNumber, totalPages) {
+  const content = ['0 G', '0.75 w'];
+  const pageWidth = 595;
+  const margin = 42;
+  let y = 802;
+  pdfText(content, 'ACCOMPLISHMENT REPORT', pageWidth / 2, y, 14, { align: 'center' });
+  y -= 20;
+  pdfText(content, reportPeriodText(), pageWidth / 2, y, 11, { align: 'center' });
+  y -= 46;
+  pdfText(content, 'Name:', margin, y, 10);
+  pdfText(content, group.name.toUpperCase(), margin + 46, y, 10);
+  pdfLine(content, margin + 44, y - 3, pageWidth - margin, y - 3);
+  y -= 20;
+  pdfText(content, 'Position:', margin, y, 10);
+  pdfText(content, state.signatories.preparedByTitle || 'Agricultural Technologist/AEW', margin + 58, y, 10);
+  pdfLine(content, margin + 56, y - 3, pageWidth - margin, y - 3);
+  y -= 46;
+  pdfText(content, 'The following tasks have been accomplished on the following days:', margin, y, 10);
+  y -= 22;
+
+  const columns = [
+    { label: 'DATE', x: margin, width: 78 },
+    { label: 'TASK', x: margin + 78, width: 266 },
+    { label: 'NUMBER OF HOURS/ MINUTES RENDERED', x: margin + 344, width: 96 },
+    { label: 'REMARKS', x: margin + 440, width: 73 }
+  ];
+  const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
+  const rowPad = 7;
+  const lineHeight = 11;
+
+  function drawHeader() {
+    const headerHeight = 34;
+    pdfRect(content, margin, y - headerHeight, tableWidth, headerHeight);
+    columns.forEach((column, index) => {
+      if (index > 0) pdfLine(content, column.x, y, column.x, y - headerHeight);
+      wrapPdfText(column.label, column.width - 8, 8).slice(0, 3).forEach((line, lineIndex) => {
+        pdfText(content, line, column.x + 4, y - 12 - (lineIndex * 9), 8, { maxWidth: column.width - 8 });
+      });
+    });
+    y -= headerHeight;
+  }
+
+  drawHeader();
+  group.plans.forEach((plan) => {
+    const taskLines = wrapPdfText(pdfTaskText(plan), columns[1].width - 8, 8).slice(0, 6);
+    const remarkLines = wrapPdfText(pdfRemarksText(plan), columns[3].width - 8, 8).slice(0, 5);
+    const rowLines = Math.max(2, taskLines.length, remarkLines.length);
+    const rowHeight = rowPad + (rowLines * lineHeight);
+    if (y - rowHeight < 116) return;
+    pdfRect(content, margin, y - rowHeight, tableWidth, rowHeight);
+    columns.slice(1).forEach((column) => pdfLine(content, column.x, y, column.x, y - rowHeight));
+    pdfText(content, formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true }), columns[0].x + 4, y - 14, 8, { maxWidth: columns[0].width - 8 });
+    taskLines.forEach((line, index) => pdfText(content, line, columns[1].x + 4, y - 14 - (index * lineHeight), 8, { maxWidth: columns[1].width - 8 }));
+    pdfText(content, pdfHoursText(plan), columns[2].x + 4, y - 14, 8, { maxWidth: columns[2].width - 8 });
+    remarkLines.forEach((line, index) => pdfText(content, line, columns[3].x + 4, y - 14 - (index * lineHeight), 8, { maxWidth: columns[3].width - 8 }));
+    y -= rowHeight;
+  });
+
+  if (!group.plans.length) {
+    pdfRect(content, margin, y - 28, tableWidth, 28);
+    pdfText(content, 'No accomplishment records for the selected week.', margin + 8, y - 18, 9);
+    y -= 28;
+  }
+
+  y = Math.min(y - 34, 102);
+  const leftX = margin;
+  const rightX = 338;
+  pdfText(content, 'Prepared by:', leftX, y + 42, 9);
+  pdfText(content, 'Reviewed by:', rightX, y + 42, 9);
+  pdfLine(content, leftX, y + 8, leftX + 200, y + 8);
+  pdfLine(content, rightX, y + 8, rightX + 200, y + 8);
+  pdfText(content, group.name.toUpperCase(), leftX + 100, y + 15, 9, { align: 'center' });
+  pdfText(content, state.signatories.reviewedBy || 'RODEL L. POMPA', rightX + 100, y + 15, 9, { align: 'center' });
+  pdfText(content, state.signatories.preparedByTitle || 'Agricultural Technologist/AEW', leftX + 100, y - 5, 8, { align: 'center' });
+  pdfText(content, state.signatories.reviewedByTitle || 'Senior Agriculturist', rightX + 100, y - 5, 8, { align: 'center' });
+  pdfText(content, 'Approved by:', pageWidth / 2, y - 42, 9, { align: 'center' });
+  pdfLine(content, pageWidth / 2 - 100, y - 76, pageWidth / 2 + 100, y - 76);
+  pdfText(content, state.signatories.approvedBy || 'DANNY S. VILLACRUSIS', pageWidth / 2, y - 69, 9, { align: 'center' });
+  pdfText(content, state.signatories.approvedByTitle || 'Municipal Agriculturist', pageWidth / 2, y - 89, 8, { align: 'center' });
+  pdfText(content, `Page ${pageNumber} of ${totalPages}`, pageWidth - margin, 24, 8, { align: 'right' });
+  return content.join('\n');
+}
+
+function makePdfBlob(pageContents) {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    `<< /Type /Pages /Kids [${pageContents.map((_, index) => `${4 + (index * 2)} 0 R`).join(' ')}] /Count ${pageContents.length} >>`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+  ];
+  pageContents.forEach((content, index) => {
+    const pageObjectNumber = 4 + (index * 2);
+    const streamObjectNumber = pageObjectNumber + 1;
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${streamObjectNumber} 0 R >>`);
+    objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+  });
+
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new Blob([pdf], { type: 'application/pdf' });
+}
+
+function downloadWeeklyPdf() {
+  const pages = staffReportPagesForPdf();
+  if (!pages.length) {
+    alert('No weekly accomplishment records found for the selected staff and week.');
+    return;
+  }
+  const pageContents = pages.map((group, index) => buildStaffReportPage(group, index + 1, pages.length));
+  const blob = makePdfBlob(pageContents);
+  const url = URL.createObjectURL(blob);
+  const staffName = isStaff() ? state.session.staffName : state.staffFilter === 'All' ? 'all-staff' : state.staffFilter;
+  const safeStaffName = String(staffName || 'staff').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `weekly-accomplishment-${safeStaffName}-${els.weekStart.value || 'report'}.pdf`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function printCleanReport() {
   const cssUrl = new URL('styles.css', window.location.href).href;
   const printWindow = window.open('', 'mao-weekly-report-print', 'popup,width=1100,height=800');
@@ -2090,6 +2347,7 @@ function bindEvents() {
     if (event.target === els.adminModal) hideAdminSettings();
   });
   document.querySelector('#exportBtn').addEventListener('click', exportCsv);
+  document.querySelector('#pdfBtn').addEventListener('click', downloadWeeklyPdf);
   els.installAppBtn.addEventListener('click', installApp);
   document.querySelector('#printBtn').addEventListener('click', printCleanReport);
   document.querySelector('#logoutBtn').addEventListener('click', handleLogout);
