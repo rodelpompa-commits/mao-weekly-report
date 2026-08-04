@@ -1966,20 +1966,53 @@ function pdfRect(content, x, y, width, height) {
 function pdfText(content, text, x, y, size = 10, options = {}) {
   const align = options.align || 'left';
   const maxWidth = options.maxWidth || 0;
+  let drawText = String(text);
+  if (maxWidth) {
+    const maxChars = Math.floor(maxWidth / (size * 0.48));
+    if (drawText.length > maxChars) {
+      drawText = `${drawText.slice(0, Math.max(0, maxChars - 3))}...`;
+    }
+  }
   let drawX = x;
   if (align === 'center') {
-    drawX = x - (String(text).length * size * 0.24);
+    drawX = x - (drawText.length * size * 0.24);
   } else if (align === 'right') {
-    drawX = x - (String(text).length * size * 0.48);
+    drawX = x - (drawText.length * size * 0.48);
   }
-  if (maxWidth && align === 'left') {
-    const clipped = String(text).length > Math.floor(maxWidth / (size * 0.48))
-      ? `${String(text).slice(0, Math.max(0, Math.floor(maxWidth / (size * 0.48)) - 3))}...`
-      : text;
-    content.push(`BT /F1 ${size} Tf ${drawX} ${y} Td (${pdfEscape(clipped)}) Tj ET`);
-    return;
-  }
-  content.push(`BT /F1 ${size} Tf ${drawX} ${y} Td (${pdfEscape(text)}) Tj ET`);
+  content.push(`BT /F1 ${size} Tf ${drawX} ${y} Td (${pdfEscape(drawText)}) Tj ET`);
+}
+
+function pdfCellText(content, text, x, y, width, size = 8) {
+  pdfText(content, text, x + (width / 2), y, size, { align: 'center', maxWidth: width - 8 });
+}
+
+async function loadPdfLetterheadImage() {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth || image.width;
+        canvas.height = image.naturalHeight || image.height;
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        const binary = atob(dataUrl.split(',')[1] || '');
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+        resolve({ width: canvas.width, height: canvas.height, data: bytes });
+      } catch (error) {
+        console.warn('PDF letterhead image could not be embedded', error);
+        resolve(null);
+      }
+    };
+    image.onerror = () => resolve(null);
+    image.src = 'images/office-letterhead.png';
+  });
 }
 
 function pdfTaskText(plan) {
@@ -2035,21 +2068,26 @@ function staffReportPagesForPdf() {
   });
 }
 
-function buildStaffReportPage(group, pageNumber, totalPages) {
+function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage = false) {
   const content = ['0 G', '0.75 w'];
   const pageWidth = 595;
   const margin = 42;
   let y = 812;
-  pdfText(content, 'Republic of the Philippines', pageWidth / 2, y, 9, { align: 'center' });
-  y -= 12;
-  pdfText(content, 'Province of Oriental Mindoro', pageWidth / 2, y, 9, { align: 'center' });
-  y -= 12;
-  pdfText(content, 'Municipality of Pinamalayan', pageWidth / 2, y, 10, { align: 'center' });
-  y -= 14;
-  pdfText(content, 'OFFICE OF THE MUNICIPAL AGRICULTURIST', pageWidth / 2, y, 11, { align: 'center' });
-  y -= 10;
-  pdfLine(content, margin, y, pageWidth - margin, y);
-  y -= 26;
+  if (hasLetterheadImage) {
+    content.push('q 540 0 0 120 27.5 705 cm /LH Do Q');
+    y = 672;
+  } else {
+    pdfText(content, 'Republic of the Philippines', pageWidth / 2, y, 9, { align: 'center' });
+    y -= 12;
+    pdfText(content, 'Province of Oriental Mindoro', pageWidth / 2, y, 9, { align: 'center' });
+    y -= 12;
+    pdfText(content, 'Municipality of Pinamalayan', pageWidth / 2, y, 10, { align: 'center' });
+    y -= 14;
+    pdfText(content, 'OFFICE OF THE MUNICIPAL AGRICULTURIST', pageWidth / 2, y, 11, { align: 'center' });
+    y -= 10;
+    pdfLine(content, margin, y, pageWidth - margin, y);
+    y -= 26;
+  }
   pdfText(content, 'ACCOMPLISHMENT REPORT', pageWidth / 2, y, 14, { align: 'center' });
   y -= 20;
   pdfText(content, reportPeriodText(), pageWidth / 2, y, 11, { align: 'center' });
@@ -2080,7 +2118,7 @@ function buildStaffReportPage(group, pageNumber, totalPages) {
     columns.forEach((column, index) => {
       if (index > 0) pdfLine(content, column.x, y, column.x, y - headerHeight);
       wrapPdfText(column.label, column.width - 8, 8).slice(0, 3).forEach((line, lineIndex) => {
-        pdfText(content, line, column.x + 4, y - 12 - (lineIndex * 9), 8, { maxWidth: column.width - 8 });
+        pdfCellText(content, line, column.x, y - 12 - (lineIndex * 9), column.width, 8);
       });
     });
     y -= headerHeight;
@@ -2095,10 +2133,10 @@ function buildStaffReportPage(group, pageNumber, totalPages) {
     if (y - rowHeight < 116) return;
     pdfRect(content, margin, y - rowHeight, tableWidth, rowHeight);
     columns.slice(1).forEach((column) => pdfLine(content, column.x, y, column.x, y - rowHeight));
-    pdfText(content, formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true }), columns[0].x + 4, y - 14, 8, { maxWidth: columns[0].width - 8 });
-    taskLines.forEach((line, index) => pdfText(content, line, columns[1].x + 4, y - 14 - (index * lineHeight), 8, { maxWidth: columns[1].width - 8 }));
-    pdfText(content, pdfHoursText(plan), columns[2].x + 4, y - 14, 8, { maxWidth: columns[2].width - 8 });
-    remarkLines.forEach((line, index) => pdfText(content, line, columns[3].x + 4, y - 14 - (index * lineHeight), 8, { maxWidth: columns[3].width - 8 }));
+    pdfCellText(content, formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true }), columns[0].x, y - 14, columns[0].width, 8);
+    taskLines.forEach((line, index) => pdfCellText(content, line, columns[1].x, y - 14 - (index * lineHeight), columns[1].width, 8));
+    pdfCellText(content, pdfHoursText(plan), columns[2].x, y - 14, columns[2].width, 8);
+    remarkLines.forEach((line, index) => pdfCellText(content, line, columns[3].x, y - 14 - (index * lineHeight), columns[3].width, 8));
     y -= rowHeight;
   });
 
@@ -2123,42 +2161,64 @@ function buildStaffReportPage(group, pageNumber, totalPages) {
   return content.join('\n');
 }
 
-function makePdfBlob(pageContents) {
+function makePdfBlob(pageContents, letterheadImage = null) {
+  const hasImage = Boolean(letterheadImage?.data?.length);
+  const firstPageObjectNumber = hasImage ? 5 : 4;
   const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    `<< /Type /Pages /Kids [${pageContents.map((_, index) => `${4 + (index * 2)} 0 R`).join(' ')}] /Count ${pageContents.length} >>`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+    ['<< /Type /Catalog /Pages 2 0 R >>'],
+    [`<< /Type /Pages /Kids [${pageContents.map((_, index) => `${firstPageObjectNumber + (index * 2)} 0 R`).join(' ')}] /Count ${pageContents.length} >>`],
+    ['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>']
   ];
+  if (hasImage) {
+    objects.push([
+      `<< /Type /XObject /Subtype /Image /Width ${letterheadImage.width} /Height ${letterheadImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${letterheadImage.data.length} >>\nstream\n`,
+      letterheadImage.data,
+      '\nendstream'
+    ]);
+  }
   pageContents.forEach((content, index) => {
-    const pageObjectNumber = 4 + (index * 2);
+    const pageObjectNumber = firstPageObjectNumber + (index * 2);
     const streamObjectNumber = pageObjectNumber + 1;
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${streamObjectNumber} 0 R >>`);
-    objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    const xObjectResource = hasImage ? ' /XObject << /LH 4 0 R >>' : '';
+    objects.push([`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >>${xObjectResource} >> /Contents ${streamObjectNumber} 0 R >>`]);
+    objects.push([`<< /Length ${content.length} >>\nstream\n${content}\nendstream`]);
   });
 
-  let pdf = '%PDF-1.4\n';
+  const encoder = new TextEncoder();
+  const chunks = [];
+  let length = 0;
   const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(pdf.length);
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  function addChunk(chunk) {
+    const bytes = typeof chunk === 'string' ? encoder.encode(chunk) : chunk;
+    chunks.push(bytes);
+    length += bytes.length;
+  }
+
+  addChunk('%PDF-1.4\n');
+  objects.forEach((objectParts, index) => {
+    offsets.push(length);
+    addChunk(`${index + 1} 0 obj\n`);
+    objectParts.forEach(addChunk);
+    addChunk('\nendobj\n');
   });
-  const xrefOffset = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  const xrefOffset = length;
+  addChunk(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`);
   offsets.slice(1).forEach((offset) => {
-    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+    addChunk(`${String(offset).padStart(10, '0')} 00000 n \n`);
   });
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-  return new Blob([pdf], { type: 'application/pdf' });
+  addChunk(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+  return new Blob(chunks, { type: 'application/pdf' });
 }
 
-function downloadWeeklyPdf() {
+async function downloadWeeklyPdf() {
   const pages = staffReportPagesForPdf();
   if (!pages.length) {
     alert('No weekly accomplishment records found for the selected staff and week.');
     return;
   }
-  const pageContents = pages.map((group, index) => buildStaffReportPage(group, index + 1, pages.length));
-  const blob = makePdfBlob(pageContents);
+  const letterheadImage = await loadPdfLetterheadImage();
+  const pageContents = pages.map((group, index) => buildStaffReportPage(group, index + 1, pages.length, Boolean(letterheadImage)));
+  const blob = makePdfBlob(pageContents, letterheadImage);
   const url = URL.createObjectURL(blob);
   const staffName = isStaff() ? state.session.staffName : state.staffFilter === 'All' ? 'all-staff' : state.staffFilter;
   const safeStaffName = String(staffName || 'staff').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
