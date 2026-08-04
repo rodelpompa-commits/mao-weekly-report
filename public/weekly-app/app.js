@@ -402,15 +402,29 @@ function taItem(label, grade, extraKeywords = []) {
   };
 }
 
+function taItemMatches(item, text) {
+  if (!item) return false;
+  if (item.keywords.some((keyword) => text.includes(keyword))) return true;
+  const matchedWords = item.words.filter((word) => text.includes(word));
+  return matchedWords.length >= Math.min(2, item.words.length);
+}
+
+function detectedCatalogItems(plan) {
+  const text = normalizedReportText(plan);
+  return applicableReportItems(plan).filter((item) => taItemMatches(item, text));
+}
+
 function systemDetectsTechnicalAssistance(plan) {
   if (isNonRatedOfficialStatus(plan)) return false;
   const text = normalizedReportText(plan);
+  const catalogMatch = detectedCatalogItems(plan).length > 0;
   const assistancePattern = /\b(technical assistance|ta\b|field visit|farm visit|site visit|assisted|assist|advised|consultation|consulted|validated|validation|inspection|inspected|training|coaching|demonstration|demo|diagnosis|recommendation|intervention|follow-up|follow up|client concern|farmer|grower|raiser|fisherfolk|beneficiary)\b/;
   const programPattern = /\b(crop|rice|corn|hvcc|vegetable|livestock|animal|swine|hog|cattle|carabao|goat|poultry|fishery|fish|pond|coastal|biosystems|engineering|equipment|facility|irrigation|post-harvest|project site)\b/;
   return Boolean(
     plan.taLatitude ||
     plan.taLongitude ||
     plan.taPhotoData ||
+    catalogMatch ||
     assistancePattern.test(text) ||
     (programPattern.test(text) && /\b(client|farmer|grower|raiser|fisherfolk|beneficiary|field|site|barangay|farm|pond|project)\b/.test(text))
   );
@@ -470,14 +484,7 @@ function detectedReportItems(plan) {
 
 function detectedReportItemObjects(plan) {
   if (!technicalAssistanceApplies(plan)) return [];
-  const text = normalizedReportText(plan);
-  return applicableReportItems(plan)
-    .filter((item) => {
-      if (item.detect) return item.detect(plan, text);
-      if (item.keywords.some((keyword) => text.includes(keyword))) return true;
-      const matchedWords = item.words.filter((word) => text.includes(word));
-      return matchedWords.length >= Math.min(2, item.words.length);
-    });
+  return detectedCatalogItems(plan);
 }
 
 function reportGrade(plan) {
