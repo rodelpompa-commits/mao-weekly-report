@@ -2039,7 +2039,17 @@ function buildStaffReportPage(group, pageNumber, totalPages) {
   const content = ['0 G', '0.75 w'];
   const pageWidth = 595;
   const margin = 42;
-  let y = 802;
+  let y = 812;
+  pdfText(content, 'Republic of the Philippines', pageWidth / 2, y, 9, { align: 'center' });
+  y -= 12;
+  pdfText(content, 'Province of Oriental Mindoro', pageWidth / 2, y, 9, { align: 'center' });
+  y -= 12;
+  pdfText(content, 'Municipality of Pinamalayan', pageWidth / 2, y, 10, { align: 'center' });
+  y -= 14;
+  pdfText(content, 'OFFICE OF THE MUNICIPAL AGRICULTURIST', pageWidth / 2, y, 11, { align: 'center' });
+  y -= 10;
+  pdfLine(content, margin, y, pageWidth - margin, y);
+  y -= 26;
   pdfText(content, 'ACCOMPLISHMENT REPORT', pageWidth / 2, y, 14, { align: 'center' });
   y -= 20;
   pdfText(content, reportPeriodText(), pageWidth / 2, y, 11, { align: 'center' });
