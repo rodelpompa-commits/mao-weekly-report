@@ -888,6 +888,16 @@ tbody tr:hover {
   color: var(--muted);
 }
 
+.program-basis {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #8a3a0a;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 10px 12px;
+}
+
 @media (max-width: 1080px) {
   .controls-panel,
   .metrics,
