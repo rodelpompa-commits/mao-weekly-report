@@ -388,6 +388,34 @@ function normalizedReportText(plan) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
+function inferProgramFromText(value = '') {
+  const text = String(value).toLowerCase();
+  if (/\b(biosystems|engineering|machinery|machine|equipment|irrigation|drainage|greenhouse|gps|gis|survey|layout|technical drawing|farm road|water system)\b/.test(text)) return 'Biosystems Engineering';
+  if (/\b(fishery|fisheries|fish kill|fishpond|fish culture|aquaculture|pond|cage culture|hatchery|seaweed|capture fisheries|fisherfolk)\b/.test(text)) return 'Fishery';
+  if (/\b(livestock|swine|hog|pig|goat|cattle|carabao|poultry|chicken|animal|asf|biosecurity|breeding|feeding|housing)\b/.test(text)) return 'Livestock';
+  if (/\b(corn|maize)\b/.test(text)) return 'Corn';
+  if (/\b(hvcc|vegetable|orchard|fertigation|pruning|protected cultivation|nursery|organic farming|gap)\b/.test(text)) return 'HVCC';
+  if (/\b(rice|palay|hybrid rice|rsbsa|seed inspection|crop cutting)\b/.test(text)) return 'Rice';
+  return '';
+}
+
+function resolvedProgramForForm(sourcePlan = null) {
+  const combinedText = [
+    sourcePlan?.program,
+    sourcePlan?.task,
+    sourcePlan?.place,
+    sourcePlan?.clients,
+    els.accomplishmentOutput?.value,
+    els.reportDetails?.value,
+    els.accomplishmentJustification?.value
+  ].filter(Boolean).join(' ');
+  const inferred = inferProgramFromText(combinedText);
+  if (inferred) return inferred;
+  if (sourcePlan?.program && programs.includes(sourcePlan.program)) return sourcePlan.program;
+  if (els.accomplishmentProgram?.value) return els.accomplishmentProgram.value;
+  return programs[0];
+}
+
 function taItem(label, grade, extraKeywords = []) {
   const words = label
     .toLowerCase()
@@ -1267,7 +1295,11 @@ function renderFieldMap() {
 
 function updateReportGradePreview() {
   const sourcePlan = state.plans.find((item) => item.id === els.accomplishmentPlanId.value);
-  const selectedProgram = els.accomplishmentProgram.value || sourcePlan?.program || programs[0];
+  const selectedProgram = resolvedProgramForForm(sourcePlan);
+  if (els.accomplishmentProgram.value !== selectedProgram) {
+    els.accomplishmentProgram.value = selectedProgram;
+    updateServiceCategoryOptions(selectedProgram, '');
+  }
   const tempPlan = {
     staffName: els.accomplishmentStaff.value,
     program: selectedProgram,
@@ -1592,14 +1624,14 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentPlanId.value = target.id;
   els.accomplishmentStaff.value = target.staffName;
   els.accomplishmentDate.value = target.accomplishmentDate || target.datePlanned || els.weekStart.value;
-  els.accomplishmentProgram.value = target.program || programs[0];
+  els.accomplishmentProgram.value = target.program || inferProgramFromText(`${target.task || ''} ${target.accomplishmentOutput || ''} ${target.reportDetails || ''}`) || programs[0];
   els.accomplishmentType.value = target.accomplishmentType || (plan ? 'Conducted' : 'Boss Instruction');
   els.accomplishmentPercent.value = target.accomplishmentPercent ?? 100;
   els.accomplishmentWorkType.value = target.workType || 'Regular Work';
   els.accomplishmentOutput.value = target.accomplishmentOutput || target.task || '';
   els.accomplishmentJustification.value = target.justification || '';
   setTechnicalAssistanceIndicator(els.accomplishmentTechnicalAssistance, technicalAssistanceApplies(target));
-  updateServiceCategoryOptions(els.accomplishmentProgram.value, target.cropStage || '');
+  updateServiceCategoryOptions(resolvedProgramForForm(target), target.cropStage || '');
   els.reportDetails.value = target.reportDetails || '';
   setLocationStatus(target.taLatitude || '', target.taLongitude || '', target.taLocationCapturedAt || '');
   setPhotoPreview(target.taPhotoData || '');
@@ -1645,7 +1677,7 @@ function saveAccomplishment(event) {
     return;
   }
   plan.staffName = isStaff() ? state.session.staffName : els.accomplishmentStaff.value;
-  plan.program = els.accomplishmentProgram.value;
+  plan.program = resolvedProgramForForm(plan);
   plan.accomplishmentDate = els.accomplishmentDate.value;
   plan.accomplishmentType = type;
   plan.accomplishmentPercent = nonRated ? 0 : Number(els.accomplishmentPercent.value);
