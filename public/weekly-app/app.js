@@ -1975,11 +1975,21 @@ function pdfText(content, text, x, y, size = 10, options = {}) {
   }
   let drawX = x;
   if (align === 'center') {
-    drawX = x - (drawText.length * size * 0.24);
+    drawX = x - (pdfTextWidth(drawText, size) / 2);
   } else if (align === 'right') {
-    drawX = x - (drawText.length * size * 0.48);
+    drawX = x - pdfTextWidth(drawText, size);
   }
   content.push(`BT /F1 ${size} Tf ${drawX} ${y} Td (${pdfEscape(drawText)}) Tj ET`);
+}
+
+function pdfTextWidth(text, size) {
+  return String(text).split('').reduce((sum, char) => {
+    if (char === ' ') return sum + (size * 0.28);
+    if ('il.,:;!|'.includes(char)) return sum + (size * 0.24);
+    if ('mwMW@#%&'.includes(char)) return sum + (size * 0.76);
+    if (/[A-Z0-9]/.test(char)) return sum + (size * 0.58);
+    return sum + (size * 0.48);
+  }, 0);
 }
 
 function pdfCellText(content, text, x, y, width, size = 8) {
@@ -2101,15 +2111,17 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   pdfText(content, 'ACCOMPLISHMENT REPORT', pageWidth / 2, y, 14, { align: 'center' });
   y -= 20;
   pdfText(content, reportPeriodText(), pageWidth / 2, y, 11, { align: 'center' });
-  y -= 46;
-  pdfText(content, 'Name:', margin, y, 10);
-  pdfText(content, group.name.toUpperCase(), (margin + 44 + pageWidth - margin) / 2, y, 10, { align: 'center' });
-  pdfLine(content, margin + 44, y - 3, pageWidth - margin, y - 3);
-  y -= 20;
-  pdfText(content, 'Position:', margin, y, 10);
-  pdfLine(content, margin + 56, y - 3, pageWidth - margin, y - 3);
-  y -= 46;
-  pdfText(content, 'The following tasks have been accomplished on the following days:', margin, y, 10);
+  y -= 34;
+  pdfText(content, 'Name:', pageWidth / 2, y, 10, { align: 'center' });
+  y -= 14;
+  pdfLine(content, pageWidth / 2 - 145, y - 3, pageWidth / 2 + 145, y - 3);
+  pdfText(content, group.name.toUpperCase(), pageWidth / 2, y, 10, { align: 'center' });
+  y -= 24;
+  pdfText(content, 'Position:', pageWidth / 2, y, 10, { align: 'center' });
+  y -= 14;
+  pdfLine(content, pageWidth / 2 - 145, y - 3, pageWidth / 2 + 145, y - 3);
+  y -= 34;
+  pdfText(content, 'The following tasks have been accomplished on the following days:', pageWidth / 2, y, 10, { align: 'center' });
   y -= 22;
 
   const columns = [
