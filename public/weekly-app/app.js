@@ -1986,6 +1986,16 @@ function pdfCellText(content, text, x, y, width, size = 8) {
   pdfText(content, text, x + (width / 2), y, size, { align: 'center', maxWidth: width - 8 });
 }
 
+function pdfCellBlock(content, lines, x, yTop, width, height, size = 8, lineHeight = 11) {
+  const cleanLines = (Array.isArray(lines) ? lines : [lines]).filter((line) => String(line || '').trim());
+  const visibleLines = cleanLines.length ? cleanLines : [''];
+  const blockHeight = (visibleLines.length - 1) * lineHeight;
+  const startY = yTop - ((height - blockHeight) / 2) - (size / 2);
+  visibleLines.forEach((line, index) => {
+    pdfCellText(content, line, x, startY - (index * lineHeight), width, size);
+  });
+}
+
 async function loadPdfLetterheadImage() {
   return new Promise((resolve) => {
     const image = new Image();
@@ -2093,7 +2103,7 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   pdfText(content, reportPeriodText(), pageWidth / 2, y, 11, { align: 'center' });
   y -= 46;
   pdfText(content, 'Name:', margin, y, 10);
-  pdfText(content, group.name.toUpperCase(), margin + 46, y, 10);
+  pdfText(content, group.name.toUpperCase(), (margin + 44 + pageWidth - margin) / 2, y, 10, { align: 'center' });
   pdfLine(content, margin + 44, y - 3, pageWidth - margin, y - 3);
   y -= 20;
   pdfText(content, 'Position:', margin, y, 10);
@@ -2117,9 +2127,7 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
     pdfRect(content, margin, y - headerHeight, tableWidth, headerHeight);
     columns.forEach((column, index) => {
       if (index > 0) pdfLine(content, column.x, y, column.x, y - headerHeight);
-      wrapPdfText(column.label, column.width - 8, 8).slice(0, 3).forEach((line, lineIndex) => {
-        pdfCellText(content, line, column.x, y - 12 - (lineIndex * 9), column.width, 8);
-      });
+      pdfCellBlock(content, wrapPdfText(column.label, column.width - 8, 8).slice(0, 3), column.x, y, column.width, headerHeight, 8, 9);
     });
     y -= headerHeight;
   }
@@ -2133,10 +2141,10 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
     if (y - rowHeight < 116) return;
     pdfRect(content, margin, y - rowHeight, tableWidth, rowHeight);
     columns.slice(1).forEach((column) => pdfLine(content, column.x, y, column.x, y - rowHeight));
-    pdfCellText(content, formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true }), columns[0].x, y - 14, columns[0].width, 8);
-    taskLines.forEach((line, index) => pdfCellText(content, line, columns[1].x, y - 14 - (index * lineHeight), columns[1].width, 8));
-    pdfCellText(content, pdfHoursText(plan), columns[2].x, y - 14, columns[2].width, 8);
-    remarkLines.forEach((line, index) => pdfCellText(content, line, columns[3].x, y - 14 - (index * lineHeight), columns[3].width, 8));
+    pdfCellBlock(content, [formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true })], columns[0].x, y, columns[0].width, rowHeight, 8, lineHeight);
+    pdfCellBlock(content, taskLines, columns[1].x, y, columns[1].width, rowHeight, 8, lineHeight);
+    pdfCellBlock(content, [pdfHoursText(plan)], columns[2].x, y, columns[2].width, rowHeight, 8, lineHeight);
+    pdfCellBlock(content, remarkLines, columns[3].x, y, columns[3].width, rowHeight, 8, lineHeight);
     y -= rowHeight;
   });
 
