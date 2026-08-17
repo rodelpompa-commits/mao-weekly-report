@@ -27,7 +27,7 @@ const officialStaffAccounts = [
 ];
 const defaultStaff = officialStaffAccounts.map((account) => account.name);
 
-const programs = ['Rice', 'HVCC', 'Corn', 'Livestock', 'Fishery', 'Biosystems Engineering'];
+const programs = ['Rice', 'HVCC', 'Corn', 'Livestock', 'Fishery', 'Biosystems Engineering', 'Admin Job', 'Others'];
 const plusFactors = {
   'Regular Work': 0,
   Planning: 5,
@@ -155,7 +155,9 @@ const reportGuides = {
   crop: 'Technical Assistance means professional advice, field diagnosis, demonstration, planning, inspection, validation, mentoring, monitoring, troubleshooting, and other extension interventions for crops. The grade is based on how complete the report is for the conducted target task.',
   Livestock: 'Technical Assistance means professional advice, diagnosis, inspection, validation, mentoring, monitoring, farm planning, surveillance, and other extension interventions for livestock raisers. The grade is based on how complete the report is for the conducted target task.',
   Fishery: 'Technical Assistance means professional advice, assessment, diagnosis, monitoring, engineering recommendation, registration assistance, and other extension interventions for fisherfolk and fishery clients. The grade is based on how complete the report is for the conducted target task.',
-  'Biosystems Engineering': 'Technical Assistance means engineering advice, inspection, validation, troubleshooting, planning, estimates, drawings, mapping, surveys, and other interventions for agricultural engineering practices. The grade is based on how complete the report is for the conducted target task.'
+  'Biosystems Engineering': 'Technical Assistance means engineering advice, inspection, validation, troubleshooting, planning, estimates, drawings, mapping, surveys, and other interventions for agricultural engineering practices. The grade is based on how complete the report is for the conducted target task.',
+  'Admin Job': 'Administrative work reports should clearly state the document, coordination, encoding, filing, meeting, procurement, or office support work completed, the office or client served, the period covered, output produced, constraints, and next action when applicable.',
+  Others: 'For other work, specify the program or activity and report the target task, actual output, client or office served, place or coverage, constraints, recommendation, and follow-up when applicable.'
 };
 const storageKey = 'weekly-itinerary-accomplishment-monitor-v1';
 const staffStorageKey = 'weekly-accomplishment-staff-v1';
@@ -237,6 +239,8 @@ const els = {
   planStaff: document.querySelector('#planStaff'),
   planDate: document.querySelector('#planDate'),
   planProgram: document.querySelector('#planProgram'),
+  planProgramOtherField: document.querySelector('#planProgramOtherField'),
+  planProgramOther: document.querySelector('#planProgramOther'),
   planWorkType: document.querySelector('#planWorkType'),
   planPlace: document.querySelector('#planPlace'),
   planTask: document.querySelector('#planTask'),
@@ -247,6 +251,8 @@ const els = {
   accomplishmentStaff: document.querySelector('#accomplishmentStaff'),
   accomplishmentDate: document.querySelector('#accomplishmentDate'),
   accomplishmentProgram: document.querySelector('#accomplishmentProgram'),
+  accomplishmentProgramOtherField: document.querySelector('#accomplishmentProgramOtherField'),
+  accomplishmentProgramOther: document.querySelector('#accomplishmentProgramOther'),
   accomplishmentType: document.querySelector('#accomplishmentType'),
   accomplishmentPercent: document.querySelector('#accomplishmentPercent'),
   accomplishmentHours: document.querySelector('#accomplishmentHours'),
@@ -310,6 +316,18 @@ function isStaff() {
 
 function isViewer() {
   return state.session.role === 'viewer';
+}
+
+function isOwnStaffPlan(plan) {
+  return isStaff() && plan?.staffName === state.session.staffName;
+}
+
+function canDeletePlan(plan) {
+  return isAdmin() || (isOwnStaffPlan(plan) && state.access.staffCanPlan);
+}
+
+function canDeleteAccomplishment(plan) {
+  return isAdmin() || (isOwnStaffPlan(plan) && state.access.staffCanAccomplish);
 }
 
 function staffAccountLines() {
@@ -380,6 +398,7 @@ function normalizedReportText(plan) {
   return [
     plan.staffName,
     plan.program,
+    plan.programOther,
     plan.place,
     plan.task,
     plan.clients,
@@ -401,6 +420,8 @@ function inferProgramFromText(value = '') {
 }
 
 function resolvedProgramForForm(sourcePlan = null) {
+  const selected = els.accomplishmentProgram?.value || sourcePlan?.program || '';
+  if (['Admin Job', 'Others'].includes(selected)) return selected;
   const combinedText = [
     sourcePlan?.program,
     sourcePlan?.task,
@@ -415,6 +436,27 @@ function resolvedProgramForForm(sourcePlan = null) {
   if (sourcePlan?.program && programs.includes(sourcePlan.program)) return sourcePlan.program;
   if (els.accomplishmentProgram?.value) return els.accomplishmentProgram.value;
   return programs[0];
+}
+
+function specifiedProgramText(plan) {
+  return String(plan?.programOther || '').trim();
+}
+
+function programLabel(plan) {
+  if (!plan) return '';
+  const specified = specifiedProgramText(plan);
+  return plan.program === 'Others' && specified ? `Others - ${specified}` : plan.program || '';
+}
+
+function toggleOtherProgramFields() {
+  if (els.planProgramOtherField) {
+    els.planProgramOtherField.classList.toggle('hidden', els.planProgram.value !== 'Others');
+    if (els.planProgram.value !== 'Others') els.planProgramOther.value = '';
+  }
+  if (els.accomplishmentProgramOtherField) {
+    els.accomplishmentProgramOtherField.classList.toggle('hidden', els.accomplishmentProgram.value !== 'Others');
+    if (els.accomplishmentProgram.value !== 'Others') els.accomplishmentProgramOther.value = '';
+  }
 }
 
 function taItem(label, grade, extraKeywords = []) {
@@ -470,7 +512,8 @@ function cropStageFor(plan) {
 
 function serviceCategoryFor(plan) {
   const catalogOptions = (taProgramCatalog[plan.program] || []).map((item) => item.label);
-  const options = catalogOptions.length ? catalogOptions : serviceCategoryOptions[plan.program] || serviceCategoryOptions.crop;
+  const fallbackOptions = serviceCategoryOptions[plan.program] || (isCropProgram(plan.program) ? serviceCategoryOptions.crop : ['General technical assistance']);
+  const options = catalogOptions.length ? catalogOptions : fallbackOptions;
   return options.includes(plan.cropStage) ? plan.cropStage : options[0];
 }
 
@@ -557,6 +600,7 @@ function technicalAssistanceCategory(plan) {
   if (plan.program === 'Livestock') return `Livestock technical assistance: ${serviceCategoryFor(plan)}`;
   if (plan.program === 'Fishery') return `Fishery technical assistance: ${serviceCategoryFor(plan)}`;
   if (plan.program === 'Biosystems Engineering') return `Biosystems engineering technical assistance: ${serviceCategoryFor(plan)}`;
+  if (plan.program === 'Others') return specifiedProgramText(plan) ? `Other work: ${specifiedProgramText(plan)}` : 'Other work';
   return 'Program technical assistance';
 }
 
@@ -565,6 +609,8 @@ function programChecklistTitle(program) {
   if (program === 'Livestock') return 'Livestock Technical Assistance Checklist';
   if (program === 'Fishery') return 'Fisheries Technical Assistance Checklist';
   if (program === 'Biosystems Engineering') return 'Biosystems Engineering Technical Assistance Checklist';
+  if (program === 'Admin Job') return 'Administrative Work Reporting Checklist';
+  if (program === 'Others') return 'Other Work Reporting Checklist';
   return 'Technical Assistance Checklist';
 }
 
@@ -1077,13 +1123,13 @@ function renderPlanRows() {
     if (isAdmin() || (isStaff() && state.access.staffCanAccomplish)) {
       planActions.push(`<button class="primary-btn" type="button" data-action="encode" data-id="${plan.id}">Accomplish</button>`);
     }
-    if (isAdmin()) {
+    if (canDeletePlan(plan)) {
       planActions.push(`<button class="delete-btn" type="button" data-action="delete-plan" data-id="${plan.id}">Delete</button>`);
     }
     row.innerHTML = `
       <td>${escapeHtml(plan.staffName)}</td>
       <td>${escapeHtml(plan.datePlanned)}</td>
-      <td>${escapeHtml(plan.program)}</td>
+      <td>${escapeHtml(programLabel(plan))}</td>
       <td>${escapeHtml(plan.workType || 'Regular Work')}</td>
       <td>${escapeHtml(plan.task)}</td>
       <td>${escapeHtml(plan.place)}</td>
@@ -1130,10 +1176,10 @@ function renderAccomplishmentRows() {
     if (canEncode) {
       accomplishmentActions.push(`<button class="primary-btn" type="button" data-action="encode" data-id="${plan.id}">Encode</button>`);
     }
-    if (isAdmin() && plan.accomplishmentType) {
+    if (canDeleteAccomplishment(plan) && plan.accomplishmentType) {
       accomplishmentActions.push(`<button class="delete-btn" type="button" data-action="delete-accomplishment" data-id="${plan.id}">Remove Accomplishment</button>`);
     }
-    if (isAdmin()) {
+    if (canDeletePlan(plan)) {
       accomplishmentActions.push(`<button class="delete-btn danger-outline" type="button" data-action="delete-plan" data-id="${plan.id}">Delete Itinerary</button>`);
     }
     row.innerHTML = `
@@ -1141,7 +1187,7 @@ function renderAccomplishmentRows() {
       <td>${escapeHtml(plan.datePlanned)}</td>
       <td>${escapeHtml(plan.task)}</td>
       <td>${escapeHtml(plan.place)}</td>
-      <td>${escapeHtml(plan.program)}</td>
+      <td>${escapeHtml(programLabel(plan))}</td>
       <td>${accomplishment}${evidence}</td>
       <td>${reportReference}</td>
       <td>${gradeHtml}</td>
@@ -1359,6 +1405,7 @@ function updateReportGradePreview() {
   const tempPlan = {
     staffName: els.accomplishmentStaff.value,
     program: selectedProgram,
+    programOther: els.accomplishmentProgramOther?.value || '',
     place: sourcePlan?.place || '',
     clients: sourcePlan?.clients || '',
     datePlanned: els.accomplishmentDate.value,
@@ -1401,7 +1448,7 @@ function updateProgramReportUi(program) {
 function updateServiceCategoryOptions(program, selectedValue = '') {
   if (!els.cropStage) return;
   const catalogOptions = (taProgramCatalog[program] || []).map((item) => item.label);
-  const options = catalogOptions.length ? catalogOptions : ['General technical assistance'];
+  const options = catalogOptions.length ? catalogOptions : serviceCategoryOptions[program] || (isCropProgram(program) ? serviceCategoryOptions.crop : ['General technical assistance']);
   els.serviceCategoryLabel.textContent = 'TA Activity / Service Category';
   updateProgramReportUi(program);
   els.cropStage.innerHTML = '';
@@ -1422,6 +1469,7 @@ function updatePlanTechnicalAssistanceIndicator() {
   const tempPlan = {
     staffName: els.planStaff.value,
     program: els.planProgram.value,
+    programOther: els.planProgramOther?.value || '',
     place: els.planPlace.value,
     task: els.planTask.value,
     clients: els.planClients.value,
@@ -1607,6 +1655,7 @@ function showPlanForm(plan = null) {
     els.planStaff.value = plan.staffName;
     els.planDate.value = plan.datePlanned;
     els.planProgram.value = plan.program;
+    els.planProgramOther.value = plan.programOther || '';
     els.planWorkType.value = plan.workType || 'Regular Work';
     els.planPlace.value = plan.place;
     els.planTask.value = plan.task;
@@ -1620,6 +1669,7 @@ function showPlanForm(plan = null) {
     if (isStaff()) els.planStaff.value = state.session.staffName;
     updatePlanTechnicalAssistanceIndicator();
   }
+  toggleOtherProgramFields();
   els.planStaff.disabled = isStaff() && !isAdmin();
   els.planTask.focus();
 }
@@ -1629,6 +1679,7 @@ function hidePlanForm() {
   els.planForm.reset();
   els.planId.value = '';
   els.planStaff.disabled = false;
+  toggleOtherProgramFields();
 }
 
 function savePlan(event) {
@@ -1644,6 +1695,7 @@ function savePlan(event) {
     weekEnd: els.weekEnd.value,
     datePlanned: els.planDate.value,
     program: els.planProgram.value,
+    programOther: els.planProgram.value === 'Others' ? els.planProgramOther.value.trim() : '',
     workType: els.planWorkType.value,
     place: els.planPlace.value.trim(),
     task: els.planTask.value.trim(),
@@ -1673,6 +1725,7 @@ function showAccomplishmentForm(plan = null) {
     weekStart: els.weekStart.value,
     weekEnd: els.weekEnd.value,
     program: programs[0],
+    programOther: '',
     workType: 'Regular Work',
     task: 'New task instructed by the Boss',
     place: '',
@@ -1684,6 +1737,7 @@ function showAccomplishmentForm(plan = null) {
   els.accomplishmentStaff.value = target.staffName;
   els.accomplishmentDate.value = target.accomplishmentDate || target.datePlanned || els.weekStart.value;
   els.accomplishmentProgram.value = target.program || inferProgramFromText(`${target.task || ''} ${target.accomplishmentOutput || ''} ${target.reportDetails || ''}`) || programs[0];
+  els.accomplishmentProgramOther.value = target.programOther || '';
   els.accomplishmentType.value = target.accomplishmentType || (plan ? 'Conducted' : 'Boss Instruction');
   els.accomplishmentPercent.value = target.accomplishmentPercent ?? 100;
   els.accomplishmentHours.value = target.accomplishmentHours || '';
@@ -1698,6 +1752,7 @@ function showAccomplishmentForm(plan = null) {
   els.taPhotoInput.value = '';
   els.accomplishmentStaff.disabled = isStaff() && !isAdmin();
   els.accomplishmentProgram.disabled = Boolean(plan && plan.task !== 'New task instructed by the Boss');
+  toggleOtherProgramFields();
   updateReportGradePreview();
   syncAccomplishmentStatusControls();
   if (!plan) {
@@ -1716,6 +1771,7 @@ function hideAccomplishmentForm() {
   els.accomplishmentPercent.disabled = false;
   els.accomplishmentHours.disabled = false;
   els.accomplishmentWorkType.disabled = false;
+  toggleOtherProgramFields();
   setLocationStatus('', '', '');
   setPhotoPreview('');
   updateReportGradePreview();
@@ -1739,6 +1795,7 @@ function saveAccomplishment(event) {
   }
   plan.staffName = isStaff() ? state.session.staffName : els.accomplishmentStaff.value;
   plan.program = resolvedProgramForForm(plan);
+  plan.programOther = plan.program === 'Others' ? els.accomplishmentProgramOther.value.trim() || plan.programOther || '' : '';
   plan.accomplishmentDate = els.accomplishmentDate.value;
   plan.accomplishmentType = type;
   plan.accomplishmentPercent = nonRated ? 0 : Number(els.accomplishmentPercent.value);
@@ -1872,7 +1929,7 @@ function exportCsv() {
     ...filteredPlans().map((plan) => [
       plan.staffName,
       plan.datePlanned,
-      plan.program,
+      programLabel(plan),
       plan.workType || 'Regular Work',
       plan.task,
       plan.place,
@@ -1943,16 +2000,30 @@ function wrapPdfText(value, maxWidth, fontSize) {
   const lines = [];
   let line = '';
   words.forEach((word) => {
-    const next = line ? `${line} ${word}` : word;
-    if (next.length > maxChars && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = next;
-    }
+    const parts = word.length > maxChars
+      ? word.match(new RegExp(`.{1,${maxChars}}`, 'g'))
+      : [word];
+    parts.forEach((part) => {
+      const next = line ? `${line} ${part}` : part;
+      if (next.length > maxChars && line) {
+        lines.push(line);
+        line = part;
+      } else {
+        line = next;
+      }
+    });
   });
   if (line) lines.push(line);
   return lines;
+}
+
+function limitedPdfLines(value, maxWidth, fontSize, maxLines) {
+  const lines = wrapPdfText(value, maxWidth, fontSize);
+  if (lines.length <= maxLines) return lines;
+  const visible = lines.slice(0, maxLines);
+  const last = visible[visible.length - 1] || '';
+  visible[visible.length - 1] = last.length > 3 ? `${last.slice(0, -3)}...` : '...';
+  return visible;
 }
 
 function pdfLine(content, x1, y1, x2, y2) {
@@ -2044,7 +2115,7 @@ function pdfTaskText(plan) {
 function pdfHoursText(plan) {
   if (!plan.accomplishmentType) return '';
   if (isNonRatedOfficialStatus(plan)) return 'Excluded';
-  return plan.accomplishmentHours || '';
+  return plan.accomplishmentHours || 'Not encoded';
 }
 
 function pdfRemarksText(plan) {
@@ -2075,7 +2146,7 @@ function staffGroupsForPdf() {
 }
 
 function staffReportPagesForPdf() {
-  const maxRowsPerPage = 8;
+  const maxRowsPerPage = 5;
   return staffGroupsForPdf().flatMap((group) => {
     const chunks = [];
     for (let index = 0; index < group.plans.length; index += maxRowsPerPage) {
@@ -2128,38 +2199,40 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   y -= 22;
 
   const columns = [
-    { label: 'DATE', x: margin, width: 78 },
-    { label: 'TASK', x: margin + 78, width: 266 },
-    { label: 'NUMBER OF HOURS/ MINUTES RENDERED', x: margin + 344, width: 96 },
-    { label: 'REMARKS', x: margin + 440, width: 73 }
+    { label: 'DATE', x: margin, width: 72 },
+    { label: 'TASK', x: margin + 72, width: 260 },
+    { label: 'NUMBER OF HOURS / MINUTES RENDERED', x: margin + 332, width: 111 },
+    { label: 'REMARKS', x: margin + 443, width: 70 }
   ];
   const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
-  const rowPad = 7;
-  const lineHeight = 11;
+  const rowPad = 16;
+  const lineHeight = 10;
 
   function drawHeader() {
     const headerHeight = 34;
     pdfRect(content, margin, y - headerHeight, tableWidth, headerHeight);
     columns.forEach((column, index) => {
       if (index > 0) pdfLine(content, column.x, y, column.x, y - headerHeight);
-      pdfCellBlock(content, wrapPdfText(column.label, column.width - 8, 8).slice(0, 3), column.x, y, column.width, headerHeight, 8, 9);
+      pdfCellBlock(content, limitedPdfLines(column.label, column.width - 10, 7.5, 4), column.x, y, column.width, headerHeight, 7.5, 8);
     });
     y -= headerHeight;
   }
 
   drawHeader();
   group.plans.forEach((plan) => {
-    const taskLines = wrapPdfText(pdfTaskText(plan), columns[1].width - 8, 8).slice(0, 6);
-    const remarkLines = wrapPdfText(pdfRemarksText(plan), columns[3].width - 8, 8).slice(0, 5);
-    const rowLines = Math.max(2, taskLines.length, remarkLines.length);
+    const fontSize = 7.5;
+    const taskLines = limitedPdfLines(pdfTaskText(plan), columns[1].width - 12, fontSize, 7);
+    const hoursLines = limitedPdfLines(pdfHoursText(plan), columns[2].width - 12, fontSize, 3);
+    const remarkLines = limitedPdfLines(pdfRemarksText(plan), columns[3].width - 12, fontSize, 5);
+    const rowLines = Math.max(2, taskLines.length, hoursLines.length, remarkLines.length);
     const rowHeight = rowPad + (rowLines * lineHeight);
     if (y - rowHeight < 116) return;
     pdfRect(content, margin, y - rowHeight, tableWidth, rowHeight);
     columns.slice(1).forEach((column) => pdfLine(content, column.x, y, column.x, y - rowHeight));
-    pdfCellBlock(content, [formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true })], columns[0].x, y, columns[0].width, rowHeight, 8, lineHeight);
-    pdfCellBlock(content, taskLines, columns[1].x, y, columns[1].width, rowHeight, 8, lineHeight);
-    pdfCellBlock(content, [pdfHoursText(plan)], columns[2].x, y, columns[2].width, rowHeight, 8, lineHeight);
-    pdfCellBlock(content, remarkLines, columns[3].x, y, columns[3].width, rowHeight, 8, lineHeight);
+    pdfCellBlock(content, [formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true })], columns[0].x, y, columns[0].width, rowHeight, fontSize, lineHeight);
+    pdfCellBlock(content, taskLines, columns[1].x, y, columns[1].width, rowHeight, fontSize, lineHeight);
+    pdfCellBlock(content, hoursLines, columns[2].x, y, columns[2].width, rowHeight, fontSize, lineHeight);
+    pdfCellBlock(content, remarkLines, columns[3].x, y, columns[3].width, rowHeight, fontSize, lineHeight);
     y -= rowHeight;
   });
 
@@ -2375,7 +2448,8 @@ function bindEvents() {
   document.querySelector('#addPlanBtn').addEventListener('click', () => showPlanForm());
   document.querySelector('#cancelPlanBtn').addEventListener('click', hidePlanForm);
   els.planForm.addEventListener('submit', savePlan);
-  [els.planStaff, els.planDate, els.planProgram, els.planPlace, els.planTask, els.planClients].forEach((input) => {
+  els.planProgram.addEventListener('change', toggleOtherProgramFields);
+  [els.planStaff, els.planDate, els.planProgram, els.planPlace, els.planTask, els.planClients, els.planProgramOther].forEach((input) => {
     input.addEventListener('input', updatePlanTechnicalAssistanceIndicator);
     input.addEventListener('change', updatePlanTechnicalAssistanceIndicator);
   });
@@ -2453,9 +2527,11 @@ function bindEvents() {
   els.accomplishmentStaff.addEventListener('change', updateReportGradePreview);
   els.accomplishmentDate.addEventListener('change', updateReportGradePreview);
   els.accomplishmentProgram.addEventListener('change', () => {
+    toggleOtherProgramFields();
     updateServiceCategoryOptions(els.accomplishmentProgram.value, els.cropStage.value);
     updateReportGradePreview();
   });
+  els.accomplishmentProgramOther.addEventListener('input', updateReportGradePreview);
   els.cropStage.addEventListener('change', updateReportGradePreview);
   els.accomplishmentType.addEventListener('change', syncAccomplishmentStatusControls);
   els.accomplishmentPercent.addEventListener('input', updateAdjustedScorePreview);
@@ -2501,12 +2577,12 @@ function bindEvents() {
       showView('accomplishmentView');
       showAccomplishmentForm(plan);
     }
-    if (button.dataset.action === 'delete-plan' && plan && confirm('Delete the whole itinerary record, including any encoded accomplishment for this item?')) {
+    if (button.dataset.action === 'delete-plan' && plan && canDeletePlan(plan) && confirm('Delete the whole itinerary record, including any encoded accomplishment for this item?')) {
       state.plans = state.plans.filter((item) => item.id !== plan.id);
       savePlans({ replaceSharedPlans: true });
       renderAll();
     }
-    if (button.dataset.action === 'delete-accomplishment' && plan && isAdmin()) {
+    if (button.dataset.action === 'delete-accomplishment' && plan && canDeleteAccomplishment(plan)) {
       removeAccomplishment(plan);
     }
   });
