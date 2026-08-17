@@ -1,31 +1,32 @@
 const officialRosterVersion = '2026-official-staff-01';
 const officialStaffAccounts = [
-  { name: 'Rodel L. Pompa' },
-  { name: 'John Aldrich R. Vinzon' },
-  { name: 'Mila D. Lim' },
-  { name: 'Richelle M. Degala' },
-  { name: 'Eng. Hidy C. Flores' },
-  { name: 'Kristine Joy M. Torres' },
-  { name: 'Mellette B. Musico' },
-  { name: 'Rose Ann O. Marasigan' },
-  { name: 'Lorie May S. Tabilisma' },
-  { name: 'Jess Mark R. Macalalad' },
-  { name: 'Aleckz Andrea Rose M. Marayan' },
-  { name: 'Kezzer G. Fabregas' },
+  { name: 'Rodel L. Pompa', position: 'Senior Agriculturist' },
+  { name: 'John Aldrich R. Vinzon', position: 'Agricultural Technologist' },
+  { name: 'Mila D. Lim', position: 'Admin Officer IV' },
+  { name: 'Richelle M. Degala', position: 'Agricultural Technologist' },
+  { name: 'Eng. Hidy C. Flores', position: 'Agricultural Technologist' },
+  { name: 'Kristine Joy M. Torres', position: 'Agricultural Technologist' },
+  { name: 'Mellette B. Musico', position: 'Agricultural Technologist' },
+  { name: 'Rose Ann O. Marasigan', position: 'Agricultural Technologist' },
+  { name: 'Lorie May S. Tabilisma', position: 'Agricultural Technologist' },
+  { name: 'Jess Mark R. Macalalad', position: 'Agricultural Technologist' },
+  { name: 'Aleckz Andrea Rose M. Marayan', position: 'Agricultural Technologist' },
+  { name: 'Kezzer G. Fabregas', position: 'Agricultural Technologist' },
   { name: 'Dra. Ithiel M. Maalihan' },
-  { name: 'Robert A. Merabete, Jr.' },
-  { name: 'Richman M. Bugarin' },
-  { name: 'Princess Joy C. Villarba' },
-  { name: 'Joshua Vargas' },
-  { name: 'Diana Rose Pedragoza' },
-  { name: 'Jaime M. Cupiado' },
-  { name: 'Aquilito S. Constantino' },
-  { name: 'Junnel F. Hernandez' },
-  { name: 'Elias G. Burgos' },
-  { name: 'Cheridan M. Faildo' },
-  { name: 'Melanio O. Mapacpac' }
+  { name: 'Robert A. Merabete, Jr.', position: 'Admin Aide III' },
+  { name: 'Richman M. Bugarin', position: 'Admin Aide III' },
+  { name: 'Princess Joy C. Villarba', position: 'Admin Aide IV' },
+  { name: 'Joshua Vargas', position: 'Admin Aide III' },
+  { name: 'Diana Rose Pedragoza', position: 'Admin Aide III' },
+  { name: 'Jaime M. Cupiado', position: 'Farm Worker I' },
+  { name: 'Aquilito S. Constantino', position: 'Admin Aide V' },
+  { name: 'Junnel F. Hernandez', position: 'Admin Aide III' },
+  { name: 'Elias G. Burgos', position: 'Corn Development & Vegetable Gardening Focal' },
+  { name: 'Cheridan M. Faildo', position: 'Admin Aide II' },
+  { name: 'Melanio O. Mapacpac', position: 'Admin Aide I' }
 ];
 const defaultStaff = officialStaffAccounts.map((account) => account.name);
+const staffDesignations = Object.fromEntries(officialStaffAccounts.map((account) => [account.name.toLowerCase(), account.position || '']));
 
 const programs = ['Rice', 'HVCC', 'Corn', 'Livestock', 'Fishery', 'Biosystems Engineering', 'Admin Job', 'Others'];
 const plusFactors = {
@@ -332,6 +333,10 @@ function canDeleteAccomplishment(plan) {
 
 function staffAccountLines() {
   return state.access.staffAccounts.map((account) => `${account.name} | ${account.password}`).join('\n');
+}
+
+function staffDesignation(name = '') {
+  return staffDesignations[String(name).toLowerCase()] || '';
 }
 
 function authHeaders() {
@@ -708,7 +713,16 @@ const grammarReplacements = [
   [/\bfarmers?\s+ass?ociation\b/gi, 'Farmers Association'],
   [/\bfisherfolks\b/gi, 'fisherfolk'],
   [/\blive stocks\b/gi, 'livestock'],
-  [/\bbio systems\b/gi, 'biosystems']
+  [/\bbio systems\b/gi, 'biosystems'],
+  [/\bmonitor status of\b/gi, 'monitored the status of'],
+  [/\bconduct(ed)? farm and home visit\b/gi, 'conducted farm and home visits'],
+  [/\btechnical assistant\b/gi, 'technical assistance'],
+  [/\bassist(ed)?\s+to\b/gi, 'assisted'],
+  [/\bencoding of\b/gi, 'encoded'],
+  [/\bmake report\b/gi, 'prepared report'],
+  [/\bto be conduct(ed)?\b/gi, 'to be conducted'],
+  [/\bclient concern is\b/gi, 'client concern was'],
+  [/\bthere is no\b/gi, 'there was no']
 ];
 
 const reportTermReplacements = [
@@ -745,10 +759,23 @@ function polishReportText(value = '') {
   return text;
 }
 
-function polishField(field) {
-  if (!field || !field.value.trim()) return;
+function polishField(field, button = null) {
+  if (!field || !field.value.trim()) {
+    if (button) {
+      const originalText = button.textContent;
+      button.textContent = 'No text';
+      setTimeout(() => { button.textContent = originalText; }, 1200);
+    }
+    return;
+  }
+  const before = field.value;
   field.value = polishReportText(field.value);
   field.dispatchEvent(new Event('input', { bubbles: true }));
+  if (button) {
+    const originalText = button.textContent;
+    button.textContent = before === field.value ? 'Checked' : 'Corrected';
+    setTimeout(() => { button.textContent = originalText; }, 1400);
+  }
 }
 
 function polishPlanFields() {
@@ -2039,9 +2066,14 @@ function pdfText(content, text, x, y, size = 10, options = {}) {
   const maxWidth = options.maxWidth || 0;
   let drawText = String(text);
   if (maxWidth) {
-    const maxChars = Math.floor(maxWidth / (size * 0.48));
-    if (drawText.length > maxChars) {
-      drawText = `${drawText.slice(0, Math.max(0, maxChars - 3))}...`;
+    while (drawText.length > 3 && pdfTextWidth(drawText, size) > maxWidth) {
+      drawText = drawText.slice(0, -1).trimEnd();
+    }
+    if (drawText !== String(text) && drawText.length > 3) {
+      while (drawText.length > 3 && pdfTextWidth(`${drawText}...`, size) > maxWidth) {
+        drawText = drawText.slice(0, -1).trimEnd();
+      }
+      drawText = `${drawText}...`;
     }
   }
   let drawX = x;
@@ -2063,17 +2095,17 @@ function pdfTextWidth(text, size) {
   }, 0);
 }
 
-function pdfCellText(content, text, x, y, width, size = 8) {
-  pdfText(content, text, x + (width / 2), y, size, { align: 'center', maxWidth: width - 8 });
+function pdfCellText(content, text, x, y, width, size = 8, padding = 7) {
+  pdfText(content, text, x + (width / 2), y, size, { align: 'center', maxWidth: width - (padding * 2) });
 }
 
-function pdfCellBlock(content, lines, x, yTop, width, height, size = 8, lineHeight = 11) {
+function pdfCellBlock(content, lines, x, yTop, width, height, size = 8, lineHeight = 11, padding = 7) {
   const cleanLines = (Array.isArray(lines) ? lines : [lines]).filter((line) => String(line || '').trim());
   const visibleLines = cleanLines.length ? cleanLines : [''];
   const blockHeight = (visibleLines.length - 1) * lineHeight;
   const startY = yTop - ((height - blockHeight) / 2) - (size / 2);
   visibleLines.forEach((line, index) => {
-    pdfCellText(content, line, x, startY - (index * lineHeight), width, size);
+    pdfCellText(content, line, x, startY - (index * lineHeight), width, size, padding);
   });
 }
 
@@ -2163,6 +2195,7 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   const content = ['0 G', '0.75 w'];
   const pageWidth = 595;
   const margin = 42;
+  const position = staffDesignation(group.name);
   let y = 812;
   if (hasLetterheadImage) {
     content.push('q 540 0 0 120 27.5 705 cm /LH Do Q');
@@ -2194,18 +2227,19 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   pdfText(content, 'Position:', reportInfoX, y, 10);
   y -= 14;
   pdfLine(content, reportInfoX, y - 3, reportInfoX + reportInfoWidth, y - 3);
+  if (position) pdfText(content, position, reportInfoCenter, y, 9, { align: 'center', maxWidth: reportInfoWidth - 8 });
   y -= 34;
   pdfText(content, 'The following tasks have been accomplished on the following days:', reportInfoX, y, 10);
   y -= 22;
 
   const columns = [
-    { label: 'DATE', x: margin, width: 72 },
-    { label: 'TASK', x: margin + 72, width: 260 },
-    { label: 'NUMBER OF HOURS / MINUTES RENDERED', x: margin + 332, width: 111 },
-    { label: 'REMARKS', x: margin + 443, width: 70 }
+    { label: 'DATE', x: margin, width: 68 },
+    { label: 'TASK', x: margin + 68, width: 252 },
+    { label: 'NUMBER OF HOURS / MINUTES RENDERED', x: margin + 320, width: 126 },
+    { label: 'REMARKS', x: margin + 446, width: 67 }
   ];
   const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
-  const rowPad = 16;
+  const rowPad = 18;
   const lineHeight = 10;
 
   function drawHeader() {
@@ -2213,26 +2247,27 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
     pdfRect(content, margin, y - headerHeight, tableWidth, headerHeight);
     columns.forEach((column, index) => {
       if (index > 0) pdfLine(content, column.x, y, column.x, y - headerHeight);
-      pdfCellBlock(content, limitedPdfLines(column.label, column.width - 10, 7.5, 4), column.x, y, column.width, headerHeight, 7.5, 8);
+      pdfCellBlock(content, limitedPdfLines(column.label, column.width - 12, 7, 4), column.x, y, column.width, headerHeight, 7, 8, 8);
     });
     y -= headerHeight;
   }
 
   drawHeader();
   group.plans.forEach((plan) => {
-    const fontSize = 7.5;
-    const taskLines = limitedPdfLines(pdfTaskText(plan), columns[1].width - 12, fontSize, 7);
-    const hoursLines = limitedPdfLines(pdfHoursText(plan), columns[2].width - 12, fontSize, 3);
+    const fontSize = 7.4;
+    const hoursFontSize = 6.6;
+    const taskLines = limitedPdfLines(pdfTaskText(plan), columns[1].width - 14, fontSize, 7);
+    const hoursLines = limitedPdfLines(pdfHoursText(plan), columns[2].width - 18, hoursFontSize, 4);
     const remarkLines = limitedPdfLines(pdfRemarksText(plan), columns[3].width - 12, fontSize, 5);
     const rowLines = Math.max(2, taskLines.length, hoursLines.length, remarkLines.length);
     const rowHeight = rowPad + (rowLines * lineHeight);
     if (y - rowHeight < 116) return;
     pdfRect(content, margin, y - rowHeight, tableWidth, rowHeight);
     columns.slice(1).forEach((column) => pdfLine(content, column.x, y, column.x, y - rowHeight));
-    pdfCellBlock(content, [formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true })], columns[0].x, y, columns[0].width, rowHeight, fontSize, lineHeight);
-    pdfCellBlock(content, taskLines, columns[1].x, y, columns[1].width, rowHeight, fontSize, lineHeight);
-    pdfCellBlock(content, hoursLines, columns[2].x, y, columns[2].width, rowHeight, fontSize, lineHeight);
-    pdfCellBlock(content, remarkLines, columns[3].x, y, columns[3].width, rowHeight, fontSize, lineHeight);
+    pdfCellBlock(content, [formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true })], columns[0].x, y, columns[0].width, rowHeight, fontSize, lineHeight, 7);
+    pdfCellBlock(content, taskLines, columns[1].x, y, columns[1].width, rowHeight, fontSize, lineHeight, 8);
+    pdfCellBlock(content, hoursLines, columns[2].x, y, columns[2].width, rowHeight, hoursFontSize, lineHeight, 9);
+    pdfCellBlock(content, remarkLines, columns[3].x, y, columns[3].width, rowHeight, fontSize, lineHeight, 7);
     y -= rowHeight;
   });
 
@@ -2251,7 +2286,7 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   pdfLine(content, rightX, y + 8, rightX + 200, y + 8);
   pdfText(content, group.name.toUpperCase(), leftX + 100, y + 15, 9, { align: 'center' });
   pdfText(content, 'DANNY S. VILLACRUSIS', rightX + 100, y + 15, 9, { align: 'center' });
-  pdfText(content, state.signatories.preparedByTitle || 'Agricultural Technologist/AEW', leftX + 100, y - 5, 8, { align: 'center' });
+  pdfText(content, position || state.signatories.preparedByTitle || 'Agricultural Technologist/AEW', leftX + 100, y - 5, 8, { align: 'center', maxWidth: 196 });
   pdfText(content, 'Municipal Agriculturist', rightX + 100, y - 5, 8, { align: 'center' });
   pdfText(content, `Page ${pageNumber} of ${totalPages}`, pageWidth - margin, 24, 8, { align: 'right' });
   return content.join('\n');
@@ -2559,7 +2594,7 @@ function bindEvents() {
   document.body.addEventListener('click', (event) => {
     const polishButton = event.target.closest('button[data-polish-target]');
     if (polishButton) {
-      polishField(els[polishButton.dataset.polishTarget]);
+      polishField(els[polishButton.dataset.polishTarget], polishButton);
       return;
     }
     const mapButton = event.target.closest('button[data-map-action]');
