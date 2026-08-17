@@ -165,6 +165,7 @@ const staffStorageKey = 'weekly-accomplishment-staff-v1';
 const signatoryStorageKey = 'weekly-accomplishment-signatories-v1';
 const accessStorageKey = 'weekly-accomplishment-access-v1';
 const sessionStorageKey = 'weekly-accomplishment-session-v1';
+const deletedPlansStorageKey = 'weekly-accomplishment-deleted-plans-v1';
 const apiBaseUrl = window.location.hostname.endsWith('github.io')
   ? 'https://weekly-accomplishment-monitor.daphneisolde.chatgpt.site'
   : '';
@@ -208,6 +209,7 @@ const state = {
   mapView: null,
   mapDrag: null
 };
+let deletedPlanIds = new Set();
 
 const els = {
   weekStart: document.querySelector('#weekStart'),
@@ -805,6 +807,49 @@ function addDays(dateValue, days) {
   return toDateInputValue(date);
 }
 
+function planDateValue(plan) {
+  return plan?.datePlanned || plan?.accomplishmentDate || '';
+}
+
+function planSortKey(plan) {
+  return [
+    plan?.weekStart || '',
+    planDateValue(plan),
+    String(plan?.staffName || '').toLowerCase(),
+    String(plan?.program || '').toLowerCase(),
+    String(plan?.task || '').toLowerCase(),
+    plan?.id || ''
+  ].join('|');
+}
+
+function sortPlans(plans = []) {
+  return [...plans].sort((a, b) => planSortKey(a).localeCompare(planSortKey(b)));
+}
+
+function activePlans(plans = []) {
+  return sortPlans(plans.filter((plan) => plan?.id && !deletedPlanIds.has(plan.id) && !plan.deletedAt));
+}
+
+function loadDeletedPlanIds() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(deletedPlansStorageKey) || '[]');
+    deletedPlanIds = new Set(Array.isArray(stored) ? stored.filter(Boolean) : []);
+  } catch {
+    deletedPlanIds = new Set();
+  }
+}
+
+function saveDeletedPlanIds() {
+  localStorage.setItem(deletedPlansStorageKey, JSON.stringify([...deletedPlanIds]));
+}
+
+function rememberDeletedPlan(planOrId) {
+  const id = typeof planOrId === 'string' ? planOrId : planOrId?.id;
+  if (!id) return;
+  deletedPlanIds.add(id);
+  saveDeletedPlanIds();
+}
+
 function setDefaultDates() {
   const start = startOfWeek(new Date());
   const end = new Date(start);
@@ -935,11 +980,13 @@ function clearSession() {
 }
 
 function loadPlans() {
+  loadDeletedPlanIds();
   const stored = localStorage.getItem(storageKey);
-  state.plans = stored ? JSON.parse(stored) : [];
+  state.plans = activePlans(stored ? JSON.parse(stored) : []);
 }
 
 function savePlans(options = {}) {
+  state.plans = activePlans(state.plans);
   localStorage.setItem(storageKey, JSON.stringify(state.plans));
   if (options.replaceSharedPlans) replaceSharedPlansNow();
   else scheduleSharedStateSave();
@@ -947,7 +994,8 @@ function savePlans(options = {}) {
 
 function sharedStatePayload() {
   return {
-    plans: state.plans,
+    plans: activePlans(state.plans),
+    deletedPlanIds: [...deletedPlanIds],
     staff: state.staff,
     access: state.access,
     signatories: state.signatories
@@ -959,6 +1007,7 @@ function hasSharedStateData(payload) {
     payload &&
     (
       (Array.isArray(payload.plans) && payload.plans.length) ||
+      (Array.isArray(payload.deletedPlanIds) && payload.deletedPlanIds.length) ||
       (Array.isArray(payload.staff) && payload.staff.length) ||
       (payload.access && Object.keys(payload.access).length) ||
       (payload.signatories && Object.keys(payload.signatories).length)
@@ -970,13 +1019,15 @@ function mergePlans(remotePlans = [], localPlans = []) {
   const byId = new Map();
   [...remotePlans, ...localPlans].forEach((plan) => {
     if (!plan || !plan.id) return;
+    if (deletedPlanIds.has(plan.id) || plan.deletedAt) return;
     byId.set(plan.id, { ...byId.get(plan.id), ...plan });
   });
-  return [...byId.values()];
+  return activePlans([...byId.values()]);
 }
 
 function persistSharedStateLocally() {
-  localStorage.setItem(storageKey, JSON.stringify(state.plans));
+  localStorage.setItem(storageKey, JSON.stringify(activePlans(state.plans)));
+  saveDeletedPlanIds();
   localStorage.setItem(staffStorageKey, JSON.stringify(state.staff));
   localStorage.setItem(accessStorageKey, JSON.stringify(state.access));
   localStorage.setItem(signatoryStorageKey, JSON.stringify(state.signatories));
@@ -989,6 +1040,8 @@ async function pushSharedState(options = {}) {
       if (response.ok) {
         const remoteState = await response.json();
         if (hasSharedStateData(remoteState)) {
+          (remoteState.deletedPlanIds || []).forEach((id) => deletedPlanIds.add(id));
+          saveDeletedPlanIds();
           state.plans = mergePlans(remoteState.plans, state.plans);
           localStorage.setItem(storageKey, JSON.stringify(state.plans));
         }
@@ -1027,7 +1080,9 @@ async function initializeSharedState() {
 
     applyingSharedState = true;
     if (hasSharedStateData(remoteState)) {
-      state.plans = Array.isArray(remoteState.plans) ? remoteState.plans : [];
+      (remoteState.deletedPlanIds || []).forEach((id) => deletedPlanIds.add(id));
+      saveDeletedPlanIds();
+      state.plans = activePlans(Array.isArray(remoteState.plans) ? remoteState.plans : []);
       state.access = { ...defaultAccess, ...(remoteState.access || {}) };
       state.signatories = { ...defaultSignatories, ...(remoteState.signatories || {}) };
       state.staff = Array.isArray(remoteState.staff) && remoteState.staff.length
@@ -1066,7 +1121,7 @@ function isInSelectedWeek(plan) {
 }
 
 function filteredPlans() {
-  return state.plans.filter((plan) => {
+  return activePlans(state.plans).filter((plan) => {
     const staffMatch = isStaff()
       ? plan.staffName === state.session.staffName
       : state.staffFilter === 'All' || plan.staffName === state.staffFilter;
@@ -1856,11 +1911,20 @@ function saveAccomplishment(event) {
   renderAll();
 }
 
+function deletePlanRecord(plan) {
+  if (!plan?.id) return;
+  rememberDeletedPlan(plan);
+  state.plans = activePlans(state.plans.filter((item) => item.id !== plan.id));
+  savePlans({ replaceSharedPlans: true });
+  renderAll();
+}
+
 function removeAccomplishment(plan) {
   const isBossOnlyTask = plan.accomplishmentType === 'Boss Instruction' && plan.task === plan.accomplishmentOutput;
   if (isBossOnlyTask) {
     if (!confirm('Delete this boss-instructed accomplishment entry?')) return;
-    state.plans = state.plans.filter((item) => item.id !== plan.id);
+    deletePlanRecord(plan);
+    return;
   } else {
     if (!confirm('Remove only the encoded accomplishment? The planned itinerary will stay in the itinerary list.')) return;
     delete plan.accomplishmentType;
@@ -2162,7 +2226,7 @@ function pdfRemarksText(plan) {
 }
 
 function staffGroupsForPdf() {
-  const plans = filteredPlans().sort((a, b) => String(a.datePlanned || '').localeCompare(String(b.datePlanned || '')));
+  const plans = activePlans(filteredPlans());
   const names = isStaff()
     ? [state.session.staffName]
     : state.staffFilter === 'All'
@@ -2587,8 +2651,8 @@ function bindEvents() {
   });
   document.querySelector('#resetBtn').addEventListener('click', () => {
     if (!confirm('Restore sample itinerary and accomplishment records?')) return;
-    state.plans = samplePlans();
-    savePlans();
+    state.plans = activePlans(samplePlans());
+    savePlans({ replaceSharedPlans: true });
     renderAll();
   });
   document.body.addEventListener('click', (event) => {
@@ -2613,9 +2677,7 @@ function bindEvents() {
       showAccomplishmentForm(plan);
     }
     if (button.dataset.action === 'delete-plan' && plan && canDeletePlan(plan) && confirm('Delete the whole itinerary record, including any encoded accomplishment for this item?')) {
-      state.plans = state.plans.filter((item) => item.id !== plan.id);
-      savePlans({ replaceSharedPlans: true });
-      renderAll();
+      deletePlanRecord(plan);
     }
     if (button.dataset.action === 'delete-accomplishment' && plan && canDeleteAccomplishment(plan)) {
       removeAccomplishment(plan);
