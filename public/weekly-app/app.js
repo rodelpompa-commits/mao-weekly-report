@@ -4,7 +4,7 @@ const officialStaffAccounts = [
   { name: 'John Aldrich R. Vinzon', position: 'Agricultural Technologist' },
   { name: 'Mila D. Lim', position: 'Admin Officer IV' },
   { name: 'Richelle M. Degala', position: 'Agricultural Technologist' },
-  { name: 'Eng. Hidy C. Flores', position: 'Agricultural Technologist' },
+  { name: 'Eng. Hidy C. Flores', position: 'Engineer III' },
   { name: 'Kristine Joy M. Torres', position: 'Agricultural Technologist' },
   { name: 'Mellette B. Musico', position: 'Agricultural Technologist' },
   { name: 'Rose Ann O. Marasigan', position: 'Agricultural Technologist' },
@@ -2173,6 +2173,16 @@ function pdfCellBlock(content, lines, x, yTop, width, height, size = 8, lineHeig
   });
 }
 
+function pdfCellBlockLeft(content, lines, x, yTop, width, height, size = 8, lineHeight = 11, padding = 8) {
+  const cleanLines = (Array.isArray(lines) ? lines : [lines]).filter((line) => String(line || '').trim());
+  const visibleLines = cleanLines.length ? cleanLines : [''];
+  const blockHeight = (visibleLines.length - 1) * lineHeight;
+  const startY = yTop - ((height - blockHeight) / 2) - (size / 2);
+  visibleLines.forEach((line, index) => {
+    pdfText(content, line, x + padding, startY - (index * lineHeight), size, { maxWidth: width - (padding * 2) });
+  });
+}
+
 async function loadPdfLetterheadImage() {
   return new Promise((resolve) => {
     const image = new Image();
@@ -2329,7 +2339,7 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
     pdfRect(content, margin, y - rowHeight, tableWidth, rowHeight);
     columns.slice(1).forEach((column) => pdfLine(content, column.x, y, column.x, y - rowHeight));
     pdfCellBlock(content, [formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true })], columns[0].x, y, columns[0].width, rowHeight, fontSize, lineHeight, 7);
-    pdfCellBlock(content, taskLines, columns[1].x, y, columns[1].width, rowHeight, fontSize, lineHeight, 8);
+    pdfCellBlockLeft(content, taskLines, columns[1].x, y, columns[1].width, rowHeight, fontSize, lineHeight, 8);
     pdfCellBlock(content, hoursLines, columns[2].x, y, columns[2].width, rowHeight, hoursFontSize, lineHeight, 9);
     pdfCellBlock(content, remarkLines, columns[3].x, y, columns[3].width, rowHeight, fontSize, lineHeight, 7);
     y -= rowHeight;
