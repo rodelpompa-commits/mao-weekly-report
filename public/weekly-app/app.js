@@ -43,7 +43,8 @@ const serviceCategoryOptions = {
   Fishery: ['Aquaculture / pond technical assistance', 'Capture fishery / gear / boat concern', 'Water quality / habitat assessment', 'Stocking / feeding / production advisory', 'Fish health / fish kill / losses', 'Registration / licensing / regulatory assistance'],
   'Biosystems Engineering': ['Farm machinery / equipment assistance', 'Irrigation / water system assistance', 'Post-harvest facility / structure assistance', 'Project inspection / validation', 'Repair / maintenance / safety concern', 'Engineering measurement / design / compliance']
 };
-const nonRatedAccomplishmentTypes = ['Absent', 'Leave', 'Official Travel'];
+const nonRatedAccomplishmentTypes = ['Absent', 'Leave', 'Official Travel', 'Holiday', 'Work from Home', 'On Travel', 'On Training/Seminar'];
+const nonTaStatusPattern = /\b(leave|holiday|work\s*from\s*home|wfh|official\s*travel|on\s*travel|travel\s*order|on\s*training|training\s*\/\s*seminar|seminar|siminar)\b/i;
 const taClients = ['Individual Farmer', 'Fisherfolk', 'Livestock Raiser', 'Cooperative', 'Farmers Association', 'Barangay', 'School', 'Private Organization', 'National Government Agency', 'LGU Office'];
 const taProgramCatalog = {
   Rice: [
@@ -415,6 +416,19 @@ function normalizedReportText(plan) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
+function isNonTaStatusRecord(plan) {
+  if (!plan) return false;
+  if (isNonRatedOfficialStatus(plan)) return true;
+  const statusText = [
+    plan.task,
+    plan.accomplishmentOutput,
+    plan.justification,
+    plan.reportDetails,
+    plan.accomplishmentType
+  ].filter(Boolean).join(' ');
+  return nonTaStatusPattern.test(statusText);
+}
+
 function inferProgramFromText(value = '') {
   const text = String(value).toLowerCase();
   if (/\b(biosystems|engineering|machinery|machine|equipment|irrigation|drainage|greenhouse|gps|gis|survey|layout|technical drawing|farm road|water system)\b/.test(text)) return 'Biosystems Engineering';
@@ -493,7 +507,7 @@ function detectedCatalogItems(plan) {
 }
 
 function systemDetectsTechnicalAssistance(plan) {
-  if (isNonRatedOfficialStatus(plan)) return false;
+  if (isNonTaStatusRecord(plan)) return false;
   const text = normalizedReportText(plan);
   const catalogMatch = detectedCatalogItems(plan).length > 0;
   const assistancePattern = /\b(technical assistance|ta\b|field visit|farm visit|site visit|assisted|assist|advised|consultation|consulted|validated|validation|inspection|inspected|training|coaching|demonstration|demo|diagnosis|recommendation|intervention|follow-up|follow up|client concern|farmer|grower|raiser|fisherfolk|beneficiary)\b/;
@@ -1694,6 +1708,7 @@ function applyAccessRules() {
   document.querySelector('#adminBtn').classList.toggle('hidden', !isAdmin());
   document.querySelector('#printBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
   document.querySelector('#pdfBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
+  document.querySelector('#itineraryPdfBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
   document.querySelector('#exportBtn').classList.toggle('hidden', !(isAdmin() || isStaff()));
   if (deferredInstallPrompt && els.installAppBtn) els.installAppBtn.classList.remove('hidden');
   document.querySelector('[data-view="dashboardView"]').classList.toggle('hidden', !(isAdmin() || isViewer()));
@@ -2218,6 +2233,10 @@ function pdfTaskText(plan) {
   return `${base}${details}`;
 }
 
+function pdfItineraryTaskText(plan) {
+  return plan.task || '';
+}
+
 function pdfHoursText(plan) {
   if (!plan.accomplishmentType) return '';
   if (isNonRatedOfficialStatus(plan)) return 'Excluded';
@@ -2233,6 +2252,10 @@ function pdfRemarksText(plan) {
   if (plan.accomplishmentType === 'Boss Instruction') return 'Boss priority task';
   if (isNonRatedOfficialStatus(plan)) return plan.accomplishmentType;
   return plan.justification ? `Justified: ${plan.justification}` : 'Justified not conducted';
+}
+
+function pdfItineraryRemarksText(plan) {
+  return plan.place ? `Planned at ${plan.place}` : 'Planned';
 }
 
 function staffGroupsForPdf() {
@@ -2265,7 +2288,13 @@ function staffReportPagesForPdf() {
   });
 }
 
-function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage = false) {
+function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage = false, options = {}) {
+  const reportTitle = options.title || 'ACCOMPLISHMENT REPORT';
+  const statement = options.statement || 'The following tasks have been accomplished on the following days:';
+  const getDateText = options.dateText || ((plan) => formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true }));
+  const getTaskText = options.taskText || pdfTaskText;
+  const getHoursText = options.hoursText || pdfHoursText;
+  const getRemarksText = options.remarksText || pdfRemarksText;
   const content = ['0 G', '0.75 w'];
   const pageWidth = 595;
   const margin = 42;
@@ -2286,7 +2315,7 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
     pdfLine(content, margin, y, pageWidth - margin, y);
     y -= 26;
   }
-  pdfText(content, 'ACCOMPLISHMENT REPORT', pageWidth / 2, y, 14, { align: 'center' });
+  pdfText(content, reportTitle, pageWidth / 2, y, 14, { align: 'center' });
   y -= 20;
   pdfText(content, reportPeriodText(), pageWidth / 2, y, 11, { align: 'center' });
   y -= 34;
@@ -2303,7 +2332,7 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   pdfLine(content, reportInfoX, y - 3, reportInfoX + reportInfoWidth, y - 3);
   if (position) pdfText(content, position, reportInfoCenter, y, 9, { align: 'center', maxWidth: reportInfoWidth - 8 });
   y -= 34;
-  pdfText(content, 'The following tasks have been accomplished on the following days:', reportInfoX, y, 10);
+  pdfText(content, statement, reportInfoX, y, 10);
   y -= 22;
 
   const columns = [
@@ -2330,15 +2359,15 @@ function buildStaffReportPage(group, pageNumber, totalPages, hasLetterheadImage 
   group.plans.forEach((plan) => {
     const fontSize = 7.4;
     const hoursFontSize = 6.6;
-    const taskLines = limitedPdfLines(pdfTaskText(plan), columns[1].width - 14, fontSize, 7);
-    const hoursLines = limitedPdfLines(pdfHoursText(plan), columns[2].width - 18, hoursFontSize, 4);
-    const remarkLines = limitedPdfLines(pdfRemarksText(plan), columns[3].width - 12, fontSize, 5);
+    const taskLines = limitedPdfLines(getTaskText(plan), columns[1].width - 14, fontSize, 7);
+    const hoursLines = limitedPdfLines(getHoursText(plan), columns[2].width - 18, hoursFontSize, 4);
+    const remarkLines = limitedPdfLines(getRemarksText(plan), columns[3].width - 12, fontSize, 5);
     const rowLines = Math.max(2, taskLines.length, hoursLines.length, remarkLines.length);
     const rowHeight = rowPad + (rowLines * lineHeight);
     if (y - rowHeight < 116) return;
     pdfRect(content, margin, y - rowHeight, tableWidth, rowHeight);
     columns.slice(1).forEach((column) => pdfLine(content, column.x, y, column.x, y - rowHeight));
-    pdfCellBlock(content, [formatDisplayDate(plan.accomplishmentDate || plan.datePlanned, { short: true })], columns[0].x, y, columns[0].width, rowHeight, fontSize, lineHeight, 7);
+    pdfCellBlock(content, [getDateText(plan)], columns[0].x, y, columns[0].width, rowHeight, fontSize, lineHeight, 7);
     pdfCellBlockLeft(content, taskLines, columns[1].x, y, columns[1].width, rowHeight, fontSize, lineHeight, 8);
     pdfCellBlock(content, hoursLines, columns[2].x, y, columns[2].width, rowHeight, hoursFontSize, lineHeight, 9);
     pdfCellBlock(content, remarkLines, columns[3].x, y, columns[3].width, rowHeight, fontSize, lineHeight, 7);
@@ -2430,6 +2459,33 @@ async function downloadWeeklyPdf() {
   const link = document.createElement('a');
   link.href = url;
   link.download = `weekly-accomplishment-${safeStaffName}-${els.weekStart.value || 'report'}.pdf`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadItineraryPdf() {
+  const pages = staffReportPagesForPdf();
+  if (!pages.length) {
+    alert('No itinerary records found for the selected staff and week.');
+    return;
+  }
+  const letterheadImage = await loadPdfLetterheadImage();
+  const itineraryOptions = {
+    title: 'ITINERARY/PLAN ACTIVITIES',
+    statement: 'The following tasks have been planned on the following days:',
+    dateText: (plan) => formatDisplayDate(plan.datePlanned, { short: true }),
+    taskText: pdfItineraryTaskText,
+    hoursText: () => '',
+    remarksText: pdfItineraryRemarksText
+  };
+  const pageContents = pages.map((group, index) => buildStaffReportPage(group, index + 1, pages.length, Boolean(letterheadImage), itineraryOptions));
+  const blob = makePdfBlob(pageContents, letterheadImage);
+  const url = URL.createObjectURL(blob);
+  const staffName = isStaff() ? state.session.staffName : state.staffFilter === 'All' ? 'all-staff' : state.staffFilter;
+  const safeStaffName = String(staffName || 'staff').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `weekly-itinerary-plan-${safeStaffName}-${els.weekStart.value || 'report'}.pdf`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -2627,6 +2683,7 @@ function bindEvents() {
   });
   document.querySelector('#exportBtn').addEventListener('click', exportCsv);
   document.querySelector('#pdfBtn').addEventListener('click', downloadWeeklyPdf);
+  document.querySelector('#itineraryPdfBtn').addEventListener('click', downloadItineraryPdf);
   els.installAppBtn.addEventListener('click', installApp);
   document.querySelector('#printBtn').addEventListener('click', printCleanReport);
   document.querySelector('#logoutBtn').addEventListener('click', handleLogout);
