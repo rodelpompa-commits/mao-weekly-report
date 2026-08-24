@@ -418,6 +418,7 @@ function normalizedReportText(plan) {
 
 function isNonTaStatusRecord(plan) {
   if (!plan) return false;
+  if (plan.program === 'Admin Job') return true;
   if (isNonRatedOfficialStatus(plan)) return true;
   const statusText = [
     plan.task,
