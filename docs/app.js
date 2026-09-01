@@ -507,19 +507,21 @@ function detectedCatalogItems(plan) {
   return catalogReportItems(plan).filter((item) => taItemMatches(item, text));
 }
 
+function isTechnicalAssistanceProgram(program = '') {
+  return ['Rice', 'HVCC', 'Corn', 'Livestock', 'Fishery', 'Biosystems Engineering'].includes(program);
+}
+
 function systemDetectsTechnicalAssistance(plan) {
   if (isNonTaStatusRecord(plan)) return false;
+  if (!isTechnicalAssistanceProgram(plan.program)) return false;
   const text = normalizedReportText(plan);
   const catalogMatch = detectedCatalogItems(plan).length > 0;
-  const assistancePattern = /\b(technical assistance|ta\b|field visit|farm visit|site visit|assisted|assist|advised|consultation|consulted|validated|validation|inspection|inspected|training|coaching|demonstration|demo|diagnosis|recommendation|intervention|follow-up|follow up|client concern|farmer|grower|raiser|fisherfolk|beneficiary)\b/;
-  const programPattern = /\b(crop|rice|corn|hvcc|vegetable|livestock|animal|swine|hog|cattle|carabao|goat|poultry|fishery|fish|pond|coastal|biosystems|engineering|equipment|facility|irrigation|post-harvest|project site)\b/;
+  const assistancePattern = /\b(technical assistance|ta\b|assisted|assist|advised|consultation|consulted|validated|validation|inspection|inspected|coaching|demonstration|demo|diagnosis|recommendation|intervention|follow-up|follow up|client concern|farmer|grower|raiser|fisherfolk|beneficiary)\b/;
+  const fieldActivityPattern = /\b(field|farm|site|barangay|pond|fishpond|cage|hatchery|coastal|facility|irrigation|drainage|greenhouse|project area|project site|farm visit|field visit|site visit|home visit|inspection|validation|monitoring|survey|mapping|assessment|diagnosis|demonstration|damage assessment|water quality|crop cutting)\b/;
+  const fieldEvidence = Boolean(plan.taLatitude || plan.taLongitude || plan.taPhotoData || fieldActivityPattern.test(text));
   return Boolean(
-    plan.taLatitude ||
-    plan.taLongitude ||
-    plan.taPhotoData ||
-    catalogMatch ||
-    assistancePattern.test(text) ||
-    (programPattern.test(text) && /\b(client|farmer|grower|raiser|fisherfolk|beneficiary|field|site|barangay|farm|pond|project)\b/.test(text))
+    fieldEvidence &&
+    (catalogMatch || assistancePattern.test(text))
   );
 }
 
