@@ -167,6 +167,7 @@ const signatoryStorageKey = 'weekly-accomplishment-signatories-v1';
 const accessStorageKey = 'weekly-accomplishment-access-v1';
 const sessionStorageKey = 'weekly-accomplishment-session-v1';
 const deletedPlansStorageKey = 'weekly-accomplishment-deleted-plans-v1';
+const sharedSyncPendingKey = 'weekly-accomplishment-sync-pending-v1';
 const apiBaseUrl = window.location.hostname.endsWith('github.io')
   ? 'https://weekly-accomplishment-monitor.daphneisolde.chatgpt.site'
   : '';
@@ -705,6 +706,18 @@ function createId(index = 0) {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}-${index}`;
 }
 
+function recordTimestamp(record) {
+  const value = Date.parse(record?.updatedAt || record?.createdAt || '');
+  return Number.isFinite(value) ? value : 0;
+}
+
+function touchPlan(plan, isNew = false) {
+  const now = new Date().toISOString();
+  if (isNew && !plan.createdAt) plan.createdAt = now;
+  plan.updatedAt = now;
+  return plan;
+}
+
 function escapeHtml(value = '') {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -1037,7 +1050,10 @@ function mergePlans(remotePlans = [], localPlans = []) {
   [...remotePlans, ...localPlans].forEach((plan) => {
     if (!plan || !plan.id) return;
     if (deletedPlanIds.has(plan.id) || plan.deletedAt) return;
-    byId.set(plan.id, { ...byId.get(plan.id), ...plan });
+    const existing = byId.get(plan.id);
+    if (!existing || recordTimestamp(plan) > recordTimestamp(existing)) {
+      byId.set(plan.id, { ...(existing || {}), ...plan });
+    }
   });
   return activePlans([...byId.values()]);
 }
@@ -1050,37 +1066,40 @@ function persistSharedStateLocally() {
   localStorage.setItem(signatoryStorageKey, JSON.stringify(state.signatories));
 }
 
-async function pushSharedState(options = {}) {
-  if (!options.replaceSharedPlans) {
-    try {
-      const response = await fetch(sharedStateEndpoint, { cache: 'no-store', headers: authHeaders() });
-      if (response.ok) {
-        const remoteState = await response.json();
-        if (hasSharedStateData(remoteState)) {
-          (remoteState.deletedPlanIds || []).forEach((id) => deletedPlanIds.add(id));
-          saveDeletedPlanIds();
-          state.plans = mergePlans(remoteState.plans, state.plans);
-          localStorage.setItem(storageKey, JSON.stringify(state.plans));
-        }
-      }
-    } catch (error) {
-      console.warn('Shared merge failed before save', error);
-    }
-  }
+function setSharedSyncPending(pending) {
+  localStorage.setItem(sharedSyncPendingKey, pending ? '1' : '0');
+}
 
-  await fetch(sharedStateEndpoint, {
+async function pushSharedState(options = {}) {
+  if (!state.session.token) return;
+  setSharedSyncPending(true);
+  const response = await fetch(sharedStateEndpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(sharedStatePayload())
+    body: JSON.stringify(sharedStatePayload()),
+    keepalive: options.keepalive === true
   });
+  const savedState = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(savedState.error || `Shared save failed (${response.status})`);
+
+  applyingSharedState = true;
+  (savedState.deletedPlanIds || []).forEach((id) => deletedPlanIds.add(id));
+  state.plans = mergePlans(savedState.plans, state.plans);
+  persistSharedStateLocally();
+  applyingSharedState = false;
+  setSharedSyncPending(false);
 }
 
 function scheduleSharedStateSave() {
   if (!sharedStateReady || applyingSharedState) return;
+  if (state.session.token) setSharedSyncPending(true);
   clearTimeout(sharedSaveTimer);
   sharedSaveTimer = setTimeout(() => {
-    pushSharedState().catch((error) => console.warn('Shared save failed', error));
-  }, 500);
+    pushSharedState().catch((error) => {
+      console.warn('Shared save failed; the local copy will be retried.', error);
+      setTimeout(() => scheduleSharedStateSave(), 5000);
+    });
+  }, 100);
 }
 
 function replaceSharedPlansNow() {
@@ -1099,7 +1118,8 @@ async function initializeSharedState() {
     if (hasSharedStateData(remoteState)) {
       (remoteState.deletedPlanIds || []).forEach((id) => deletedPlanIds.add(id));
       saveDeletedPlanIds();
-      state.plans = activePlans(Array.isArray(remoteState.plans) ? remoteState.plans : []);
+      const localPlans = activePlans(state.plans);
+      state.plans = mergePlans(Array.isArray(remoteState.plans) ? remoteState.plans : [], localPlans);
       state.access = { ...defaultAccess, ...(remoteState.access || {}) };
       state.signatories = { ...defaultSignatories, ...(remoteState.signatories || {}) };
       state.staff = Array.isArray(remoteState.staff) && remoteState.staff.length
@@ -1109,6 +1129,14 @@ async function initializeSharedState() {
       persistSharedStateLocally();
       populateStaffSelects();
       renderAll();
+      const remoteById = new Map((remoteState.plans || []).filter((plan) => plan?.id).map((plan) => [plan.id, plan]));
+      const hasUnsyncedLocalRecords = localPlans.some((plan) => {
+        const remotePlan = remoteById.get(plan.id);
+        return !remotePlan || recordTimestamp(plan) > recordTimestamp(remotePlan);
+      });
+      if (state.session.token && (localStorage.getItem(sharedSyncPendingKey) === '1' || hasUnsyncedLocalRecords)) {
+        await pushSharedState();
+      }
     } else if (state.session.token) {
       await pushSharedState();
     }
@@ -1801,6 +1829,7 @@ function savePlan(event) {
     task: els.planTask.value.trim(),
     clients: els.planClients.value.trim()
   };
+  touchPlan(plan, !existing);
   plan.technicalAssistance = technicalAssistanceApplies(plan);
   const index = state.plans.findIndex((item) => item.id === plan.id);
   if (index >= 0) state.plans[index] = plan;
@@ -1832,6 +1861,7 @@ function showAccomplishmentForm(plan = null) {
     clients: ''
   };
   if (!plan) state.plans.unshift(target);
+  if (!plan) touchPlan(target, true);
   els.accomplishmentForm.classList.remove('hidden');
   els.accomplishmentPlanId.value = target.id;
   els.accomplishmentStaff.value = target.staffName;
@@ -1924,6 +1954,7 @@ function saveAccomplishment(event) {
     plan.weekStart = els.weekStart.value;
     plan.weekEnd = els.weekEnd.value;
   }
+  touchPlan(plan, !plan.createdAt);
   savePlans();
   hideAccomplishmentForm();
   renderAll();
@@ -1959,6 +1990,7 @@ function removeAccomplishment(plan) {
     delete plan.taLongitude;
     delete plan.taLocationCapturedAt;
     delete plan.taPhotoData;
+    touchPlan(plan, !plan.createdAt);
   }
   savePlans({ replaceSharedPlans: true });
   renderAll();
@@ -2782,6 +2814,13 @@ function bindEvents() {
     event.preventDefault();
     zoomFieldMap(event.deltaY < 0 ? 0.86 : 1.14);
   }, { passive: false });
+  window.addEventListener('online', () => scheduleSharedStateSave());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && localStorage.getItem(sharedSyncPendingKey) === '1') {
+      clearTimeout(sharedSaveTimer);
+      pushSharedState({ keepalive: true }).catch(() => {});
+    }
+  });
 }
 
 setDefaultDates();

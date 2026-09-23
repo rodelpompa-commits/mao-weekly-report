@@ -64,6 +64,7 @@ export default worker;
 
 type WeeklyState = {
   plans?: unknown[];
+  deletedPlanIds?: string[];
   staff?: unknown[];
   access?: Record<string, unknown>;
   signatories?: Record<string, unknown>;
@@ -127,6 +128,7 @@ async function handleWeeklyState(request: Request, env: Env): Promise<Response> 
 
   if (request.method === "GET") {
     const session = await getSession(request, env.DB);
+    if (!session) return jsonResponse({ error: "Please log in to view the shared records." }, 401, request);
     const row = await env.DB
       .prepare("SELECT value FROM app_state WHERE key = ?")
       .bind(weeklyStateKey)
@@ -139,39 +141,102 @@ async function handleWeeklyState(request: Request, env: Env): Promise<Response> 
   if (request.method === "POST") {
     const session = await getSession(request, env.DB);
     if (!session) return jsonResponse({ error: "Please log in again before saving." }, 401, request);
+    if (session.role === "viewer") return jsonResponse({ error: "Viewer accounts cannot change records." }, 403, request);
 
     const body = await request.json<WeeklyState>();
-    const current = await env.DB
-      .prepare("SELECT value FROM app_state WHERE key = ?")
-      .bind(weeklyStateKey)
-      .first<{ value: string }>();
-    const currentState = current ? JSON.parse(current.value) : {};
-    const requestedAccess = body.access && typeof body.access === "object" ? body.access : {};
-    const currentAccess = currentState.access && typeof currentState.access === "object" ? currentState.access : {};
-
-    const nextState = {
-      plans: Array.isArray(body.plans) ? body.plans : [],
-      staff: Array.isArray(body.staff) ? body.staff : [],
-      access: session.role === "admin" ? sanitizeAccess(requestedAccess) : sanitizeAccess(currentAccess),
-      signatories: body.signatories && typeof body.signatories === "object" ? body.signatories : {},
-      updatedAt: new Date().toISOString(),
-    };
+    const nextState = await saveMergedWeeklyState(env.DB, body, session);
 
     if (session.role === "admin") {
+      const requestedAccess = body.access && typeof body.access === "object" ? body.access : {};
       await replaceAuthAccounts(env.DB, requestedAccess);
     }
-
-    await env.DB
-      .prepare(
-        "INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
-      )
-      .bind(weeklyStateKey, JSON.stringify(nextState), nextState.updatedAt)
-      .run();
-
-    return jsonResponse(nextState, 200, request);
+    return jsonResponse(await stateForClient(env.DB, nextState, session.role === "admin"), 200, request);
   }
 
   return jsonResponse({ error: "Method not allowed." }, 405, request);
+}
+
+type SessionInfo = { role: string; staffName: string };
+type PlanRecord = Record<string, unknown> & { id: string; staffName?: string; updatedAt?: string; createdAt?: string };
+
+function validPlans(value: unknown): PlanRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is PlanRecord => (
+    Boolean(item && typeof item === "object" && String((item as { id?: unknown }).id || "").trim())
+  ));
+}
+
+function recordTime(record: PlanRecord): number {
+  const value = Date.parse(String(record.updatedAt || record.createdAt || ""));
+  return Number.isFinite(value) ? value : 0;
+}
+
+function mergeWeeklyState(current: WeeklyState, incoming: WeeklyState, session: SessionInfo): WeeklyState {
+  const currentPlans = validPlans(current.plans);
+  const incomingPlans = validPlans(incoming.plans);
+  const currentById = new Map(currentPlans.map((plan) => [plan.id, plan]));
+  const incomingById = new Map(incomingPlans.map((plan) => [plan.id, plan]));
+  const deletedPlanIds = new Set(
+    Array.isArray(current.deletedPlanIds) ? current.deletedPlanIds.map(String).filter(Boolean) : []
+  );
+
+  const requestedDeletes = Array.isArray(incoming.deletedPlanIds)
+    ? incoming.deletedPlanIds.map(String).filter(Boolean)
+    : [];
+  requestedDeletes.forEach((id) => {
+    const owner = currentById.get(id)?.staffName || incomingById.get(id)?.staffName || "";
+    if (session.role === "admin" || owner === session.staffName) deletedPlanIds.add(id);
+  });
+
+  incomingPlans.forEach((plan) => {
+    if (session.role !== "admin" && plan.staffName !== session.staffName) return;
+    if (deletedPlanIds.has(plan.id)) return;
+    const existing = currentById.get(plan.id);
+    if (!existing || recordTime(plan) > recordTime(existing)) currentById.set(plan.id, plan);
+  });
+
+  deletedPlanIds.forEach((id) => currentById.delete(id));
+  const requestedAccess = incoming.access && typeof incoming.access === "object" ? incoming.access : {};
+  const currentAccess = current.access && typeof current.access === "object" ? current.access : {};
+  const currentSignatories = current.signatories && typeof current.signatories === "object" ? current.signatories : {};
+  const requestedSignatories = incoming.signatories && typeof incoming.signatories === "object" ? incoming.signatories : {};
+
+  return {
+    plans: [...currentById.values()],
+    deletedPlanIds: [...deletedPlanIds],
+    staff: session.role === "admin" && Array.isArray(incoming.staff) ? incoming.staff : current.staff || [],
+    access: session.role === "admin" ? sanitizeAccess(requestedAccess) : sanitizeAccess(currentAccess),
+    signatories: session.role === "admin" ? requestedSignatories : currentSignatories,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+async function saveMergedWeeklyState(db: D1Database, incoming: WeeklyState, session: SessionInfo): Promise<WeeklyState> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const row = await db
+      .prepare("SELECT value, updated_at FROM app_state WHERE key = ?")
+      .bind(weeklyStateKey)
+      .first<{ value: string; updated_at: string }>();
+    let current: WeeklyState = {};
+    if (row?.value) {
+      try {
+        current = JSON.parse(row.value) as WeeklyState;
+      } catch {
+        current = {};
+      }
+    }
+    const nextState = mergeWeeklyState(current, incoming, session);
+    const nextUpdatedAt = `${nextState.updatedAt}-${crypto.randomUUID()}`;
+    const result = row
+      ? await db.prepare("UPDATE app_state SET value = ?, updated_at = ? WHERE key = ? AND updated_at = ?")
+        .bind(JSON.stringify(nextState), nextUpdatedAt, weeklyStateKey, row.updated_at)
+        .run()
+      : await db.prepare("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING")
+        .bind(weeklyStateKey, JSON.stringify(nextState), nextUpdatedAt)
+        .run();
+    if ((result.meta?.changes || 0) > 0) return nextState;
+  }
+  throw new Error("The records changed during saving. Please try again.");
 }
 
 async function handleLogin(request: Request, env: Env): Promise<Response> {
@@ -255,6 +320,7 @@ async function stateForClient(db: D1Database, storedState: WeeklyState | null, i
 
   return {
     plans: Array.isArray(storedState?.plans) ? storedState?.plans : [],
+    deletedPlanIds: Array.isArray(storedState?.deletedPlanIds) ? storedState.deletedPlanIds : [],
     staff: Array.isArray(storedState?.staff) && storedState.staff.length
       ? storedState.staff
       : staffAccounts.map((account) => account.name),
