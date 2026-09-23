@@ -40,3 +40,8 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# local Sites packaging output
+/*-site.tar.gz
+/persistence-fix-site.tar.gz
+/site-package-*/
