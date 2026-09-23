@@ -128,13 +128,23 @@ async function handleWeeklyState(request: Request, env: Env): Promise<Response> 
 
   if (request.method === "GET") {
     const session = await getSession(request, env.DB);
-    if (!session) return jsonResponse({ error: "Please log in to view the shared records." }, 401, request);
     const row = await env.DB
       .prepare("SELECT value FROM app_state WHERE key = ?")
       .bind(weeklyStateKey)
       .first<{ value: string }>();
 
     const storedState = row ? JSON.parse(row.value) : null;
+    if (!session) {
+      const publicState = await stateForClient(env.DB, storedState, false);
+      return jsonResponse({
+        plans: [],
+        deletedPlanIds: [],
+        staff: publicState.staff,
+        access: publicState.access,
+        signatories: defaultSignatories,
+        updatedAt: publicState.updatedAt,
+      }, 200, request);
+    }
     return jsonResponse(await stateForClient(env.DB, storedState, session?.role === "admin"), 200, request);
   }
 
