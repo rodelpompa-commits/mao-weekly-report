@@ -75,33 +75,6 @@ const weeklyStateKey = "mao-weekly-shared-state";
 const weeklyStateBackupKey = "mao-weekly-shared-state-backup-2026-09-25";
 const recordStoreMigrationKey = "mao-weekly-record-store-migrated-v1";
 const sessionDays = 7;
-const officialStaffAccounts = [
-  ["Rodel L. Pompa", "1001"],
-  ["John Aldrich R. Vinzon", "1002"],
-  ["Mila D. Lim", "1003"],
-  ["Richelle M. Degala", "1004"],
-  ["Eng. Hidy C. Flores", "1005"],
-  ["Kristine Joy M. Torres", "1006"],
-  ["Mellette B. Musico", "1007"],
-  ["Rose Ann O. Marasigan", "1008"],
-  ["Lorie May S. Tabilisma", "1009"],
-  ["Jess Mark R. Macalalad", "1010"],
-  ["Aleckz Andrea Rose M. Marayan", "1011"],
-  ["Kezzer G. Fabregas", "1012"],
-  ["Dra. Ithiel M. Maalihan", "1013"],
-  ["Robert A. Merabete, Jr.", "1014"],
-  ["Richman M. Bugarin", "1015"],
-  ["Princess Joy C. Villarba", "1016"],
-  ["Joshua Vargas", "1017"],
-  ["Diana Rose Pedragoza", "1018"],
-  ["Jaime M. Cupiado", "1019"],
-  ["Aquilito S. Constantino", "1020"],
-  ["Junnel F. Hernandez", "1021"],
-  ["Elias G. Burgos", "1022"],
-  ["Cheridan M. Faildo", "1023"],
-  ["Melanio O. Mapacpac", "1024"],
-];
-
 const defaultAccess = {
   rosterVersion: "2026-official-staff-01",
   staffPassword: "",
@@ -357,15 +330,9 @@ async function ensureWeeklyTables(db: D1Database): Promise<void> {
   ]);
 
   const row = await db.prepare("SELECT COUNT(*) AS count FROM auth_accounts").first<{ count: number }>();
-  if ((row?.count || 0) > 0) return;
-
-  await db.batch([
-    db.prepare("INSERT INTO auth_accounts (role, name, password) VALUES (?, ?, ?)").bind("admin", "admin", "mao2026"),
-    db.prepare("INSERT INTO auth_accounts (role, name, password) VALUES (?, ?, ?)").bind("viewer", "viewer", "viewer123"),
-    ...officialStaffAccounts.map(([name, password]) => (
-      db.prepare("INSERT INTO auth_accounts (role, name, password) VALUES (?, ?, ?)").bind("staff", name, password)
-    )),
-  ]);
+  if ((row?.count || 0) === 0) {
+    console.error("No authentication accounts are configured for this Site.");
+  }
 }
 
 async function stateForClient(
@@ -431,19 +398,25 @@ async function stateForClient(
 }
 
 async function replaceAuthAccounts(db: D1Database, access: Record<string, unknown>): Promise<void> {
+  const existingRows = await db.prepare("SELECT role, name, password FROM auth_accounts")
+    .all<{ role: string; name: string; password: string }>();
+  const existingPasswords = new Map(
+    (existingRows.results || []).map((account) => [`${account.role}:${account.name}`, account.password])
+  );
   const staffAccounts = Array.isArray(access.staffAccounts) ? access.staffAccounts : [];
   const staffInserts = staffAccounts
     .map((item) => {
       if (!item || typeof item !== "object") return null;
       const account = item as { name?: unknown; password?: unknown };
       const name = String(account.name || "").trim();
-      const password = String(account.password || "").trim();
-      return name ? [name, password || "1001"] : null;
+      const password = String(account.password || "").trim() || existingPasswords.get(`staff:${name}`) || "";
+      return name && password ? [name, password] : null;
     })
     .filter((item): item is string[] => Boolean(item));
 
-  const adminPassword = String(access.adminPassword || "mao2026").trim() || "mao2026";
-  const viewerPassword = String(access.viewerPassword || "viewer123").trim() || "viewer123";
+  const adminPassword = String(access.adminPassword || "").trim() || existingPasswords.get("admin:admin") || "";
+  const viewerPassword = String(access.viewerPassword || "").trim() || existingPasswords.get("viewer:viewer") || "";
+  if (!adminPassword || !viewerPassword) throw new Error("Admin and viewer passwords must be configured.");
 
   await db.prepare("DELETE FROM auth_accounts").run();
   await db.batch([
