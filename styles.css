@@ -139,6 +139,26 @@ h2 {
   padding: 9px 12px;
 }
 
+.sync-status {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 108px;
+  text-align: center;
+}
+
+.sync-status.saving {
+  color: var(--primary);
+}
+
+.sync-status.saved {
+  color: var(--ok);
+}
+
+.sync-status.error {
+  color: var(--bad);
+}
+
 .controls-panel {
   display: grid;
   gap: 14px;
