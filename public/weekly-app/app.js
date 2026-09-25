@@ -212,6 +212,8 @@ const state = {
   mapDrag: null
 };
 let deletedPlanIds = new Set();
+let dirtyPlanIds = new Set();
+let dirtyDeletedPlanIds = new Set();
 
 const els = {
   weekStart: document.querySelector('#weekStart'),
@@ -223,6 +225,8 @@ const els = {
   loginPassword: document.querySelector('#loginPassword'),
   loginMessage: document.querySelector('#loginMessage'),
   sessionBadge: document.querySelector('#sessionBadge'),
+  syncStatus: document.querySelector('#syncStatus'),
+  syncNowBtn: document.querySelector('#syncNowBtn'),
   weekEnd: document.querySelector('#weekEnd'),
   staffFilter: document.querySelector('#staffFilter'),
   programFilter: document.querySelector('#programFilter'),
@@ -715,7 +719,18 @@ function touchPlan(plan, isNew = false) {
   const now = new Date().toISOString();
   if (isNew && !plan.createdAt) plan.createdAt = now;
   plan.updatedAt = now;
+  delete plan.migratedFromLegacy;
+  if (plan.id) dirtyPlanIds.add(plan.id);
   return plan;
+}
+
+function recordCompleteness(record = {}) {
+  const fields = [
+    'task', 'place', 'clients', 'accomplishmentType', 'accomplishmentDate',
+    'accomplishmentHours', 'accomplishmentOutput', 'justification', 'reportDetails',
+    'taLatitude', 'taLongitude', 'taPhotoData'
+  ];
+  return fields.reduce((score, field) => score + (String(record[field] || '').trim() ? 1 : 0), 0);
 }
 
 function escapeHtml(value = '') {
@@ -877,6 +892,8 @@ function rememberDeletedPlan(planOrId) {
   const id = typeof planOrId === 'string' ? planOrId : planOrId?.id;
   if (!id) return;
   deletedPlanIds.add(id);
+  dirtyDeletedPlanIds.add(id);
+  dirtyPlanIds.delete(id);
   saveDeletedPlanIds();
 }
 
@@ -1022,10 +1039,10 @@ function savePlans(options = {}) {
   else scheduleSharedStateSave();
 }
 
-function sharedStatePayload() {
+function sharedStatePayload(planIds = dirtyPlanIds, deletedIds = dirtyDeletedPlanIds) {
   return {
-    plans: activePlans(state.plans),
-    deletedPlanIds: [...deletedPlanIds],
+    plans: activePlans(state.plans).filter((plan) => planIds.has(plan.id)),
+    deletedPlanIds: [...deletedIds],
     staff: state.staff,
     access: state.access,
     signatories: state.signatories
@@ -1051,7 +1068,10 @@ function mergePlans(remotePlans = [], localPlans = []) {
     if (!plan || !plan.id) return;
     if (deletedPlanIds.has(plan.id) || plan.deletedAt) return;
     const existing = byId.get(plan.id);
-    if (!existing || recordTimestamp(plan) > recordTimestamp(existing)) {
+    const isNewer = recordTimestamp(plan) > recordTimestamp(existing);
+    const isRicherTie = recordTimestamp(plan) === recordTimestamp(existing)
+      && recordCompleteness(plan) > recordCompleteness(existing);
+    if (!existing || isNewer || isRicherTie) {
       byId.set(plan.id, { ...(existing || {}), ...plan });
     }
   });
@@ -1070,14 +1090,29 @@ function setSharedSyncPending(pending) {
   localStorage.setItem(sharedSyncPendingKey, pending ? '1' : '0');
 }
 
+function setSyncStatus(message, status = '') {
+  if (!els.syncStatus) return;
+  els.syncStatus.textContent = message;
+  els.syncStatus.className = `sync-status${status ? ` ${status}` : ''}`;
+}
+
 async function pushSharedState(options = {}) {
   if (!state.session.token) return;
+  const planIds = new Set(dirtyPlanIds);
+  const deletedIds = new Set(dirtyDeletedPlanIds);
+  const sentPlanTimes = new Map(
+    activePlans(state.plans)
+      .filter((plan) => planIds.has(plan.id))
+      .map((plan) => [plan.id, recordTimestamp(plan)])
+  );
+  const requestBody = JSON.stringify(sharedStatePayload(planIds, deletedIds));
   setSharedSyncPending(true);
+  setSyncStatus('Saving securely...', 'saving');
   const response = await fetch(sharedStateEndpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(sharedStatePayload()),
-    keepalive: options.keepalive === true
+    body: requestBody,
+    keepalive: options.keepalive === true && requestBody.length < 60000
   });
   const savedState = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(savedState.error || `Shared save failed (${response.status})`);
@@ -1087,7 +1122,14 @@ async function pushSharedState(options = {}) {
   state.plans = mergePlans(savedState.plans, state.plans);
   persistSharedStateLocally();
   applyingSharedState = false;
-  setSharedSyncPending(false);
+  planIds.forEach((id) => {
+    const current = state.plans.find((plan) => plan.id === id);
+    if (!current || recordTimestamp(current) <= (sentPlanTimes.get(id) || 0)) dirtyPlanIds.delete(id);
+  });
+  deletedIds.forEach((id) => dirtyDeletedPlanIds.delete(id));
+  const stillPending = dirtyPlanIds.size > 0 || dirtyDeletedPlanIds.size > 0;
+  setSharedSyncPending(stillPending);
+  setSyncStatus(stillPending ? 'More changes pending' : 'Saved securely', stillPending ? 'saving' : 'saved');
 }
 
 function scheduleSharedStateSave() {
@@ -1097,6 +1139,7 @@ function scheduleSharedStateSave() {
   sharedSaveTimer = setTimeout(() => {
     pushSharedState().catch((error) => {
       console.warn('Shared save failed; the local copy will be retried.', error);
+      setSyncStatus('Saved on device - retrying', 'error');
       setTimeout(() => scheduleSharedStateSave(), 5000);
     });
   }, 100);
@@ -1105,11 +1148,16 @@ function scheduleSharedStateSave() {
 function replaceSharedPlansNow() {
   if (!sharedStateReady || applyingSharedState || !state.session.token) return;
   clearTimeout(sharedSaveTimer);
-  pushSharedState({ replaceSharedPlans: true }).catch((error) => console.warn('Shared replace failed', error));
+  pushSharedState({ replaceSharedPlans: true }).catch((error) => {
+    console.warn('Shared delete/update failed; the local copy will be retried.', error);
+    setSyncStatus('Saved on device - retrying', 'error');
+    setTimeout(() => scheduleSharedStateSave(), 5000);
+  });
 }
 
 async function initializeSharedState() {
   try {
+    if (state.session.token) setSyncStatus('Loading saved records...', 'saving');
     const response = await fetch(sharedStateEndpoint, { cache: 'no-store', headers: authHeaders() });
     if (!response.ok) throw new Error(`Shared storage unavailable (${response.status})`);
     const remoteState = await response.json();
@@ -1118,8 +1166,23 @@ async function initializeSharedState() {
     if (hasSharedStateData(remoteState)) {
       (remoteState.deletedPlanIds || []).forEach((id) => deletedPlanIds.add(id));
       saveDeletedPlanIds();
-      const localPlans = activePlans(state.plans);
-      state.plans = mergePlans(Array.isArray(remoteState.plans) ? remoteState.plans : [], localPlans);
+      const allLocalPlans = activePlans(state.plans);
+      const localPlans = isStaff()
+        ? allLocalPlans.filter((plan) => plan.staffName === state.session.staffName)
+        : allLocalPlans;
+      const remotePlans = Array.isArray(remoteState.plans) ? remoteState.plans : [];
+      const remoteById = new Map(remotePlans.filter((plan) => plan?.id).map((plan) => [plan.id, plan]));
+      const recoveryCandidates = state.session.token && !isViewer()
+        ? localPlans.filter((plan) => {
+          const remotePlan = remoteById.get(plan.id);
+          if (!remotePlan) return true;
+          if (recordTimestamp(plan) > recordTimestamp(remotePlan)) return true;
+          const canRecoverLegacyCopy = remotePlan.migratedFromLegacy === true;
+          return canRecoverLegacyCopy && recordCompleteness(plan) > recordCompleteness(remotePlan);
+        })
+        : [];
+      recoveryCandidates.forEach((plan) => touchPlan(plan, !plan.createdAt));
+      if (state.session.token) state.plans = mergePlans(remotePlans, localPlans);
       state.access = { ...defaultAccess, ...(remoteState.access || {}) };
       state.signatories = { ...defaultSignatories, ...(remoteState.signatories || {}) };
       state.staff = Array.isArray(remoteState.staff) && remoteState.staff.length
@@ -1129,19 +1192,17 @@ async function initializeSharedState() {
       persistSharedStateLocally();
       populateStaffSelects();
       renderAll();
-      const remoteById = new Map((remoteState.plans || []).filter((plan) => plan?.id).map((plan) => [plan.id, plan]));
-      const hasUnsyncedLocalRecords = localPlans.some((plan) => {
-        const remotePlan = remoteById.get(plan.id);
-        return !remotePlan || recordTimestamp(plan) > recordTimestamp(remotePlan);
-      });
-      if (state.session.token && (localStorage.getItem(sharedSyncPendingKey) === '1' || hasUnsyncedLocalRecords)) {
+      if (state.session.token && (localStorage.getItem(sharedSyncPendingKey) === '1' || recoveryCandidates.length)) {
         await pushSharedState();
+      } else if (state.session.token) {
+        setSyncStatus('Saved records loaded', 'saved');
       }
     } else if (state.session.token) {
       await pushSharedState();
     }
   } catch (error) {
     console.warn('Shared storage is unavailable; using this device only for now.', error);
+    if (state.session.token) setSyncStatus('Saved on device - offline', 'error');
   } finally {
     applyingSharedState = false;
     sharedStateReady = true;
@@ -2620,7 +2681,20 @@ function handleLogout() {
   clearSession();
   hidePlanForm();
   hideAccomplishmentForm();
+  setSyncStatus('Sign in to load records');
   renderAll();
+}
+
+async function syncNow() {
+  if (!state.session.token) return;
+  clearTimeout(sharedSaveTimer);
+  try {
+    await initializeSharedState();
+    if (dirtyPlanIds.size || dirtyDeletedPlanIds.size) await pushSharedState();
+  } catch (error) {
+    console.warn('Manual synchronization failed', error);
+    setSyncStatus('Saved on device - retrying', 'error');
+  }
 }
 
 function bindEvents() {
@@ -2722,6 +2796,7 @@ function bindEvents() {
   els.installAppBtn.addEventListener('click', installApp);
   document.querySelector('#printBtn').addEventListener('click', printCleanReport);
   document.querySelector('#logoutBtn').addEventListener('click', handleLogout);
+  els.syncNowBtn.addEventListener('click', syncNow);
   els.reportDetails.addEventListener('input', updateReportGradePreview);
   els.accomplishmentOutput.addEventListener('input', updateReportGradePreview);
   els.accomplishmentJustification.addEventListener('input', updateReportGradePreview);
@@ -2753,7 +2828,7 @@ function bindEvents() {
   });
   document.querySelector('#resetBtn').addEventListener('click', () => {
     if (!confirm('Restore sample itinerary and accomplishment records?')) return;
-    state.plans = activePlans(samplePlans());
+    state.plans = activePlans(samplePlans().map((plan) => touchPlan(plan, true)));
     savePlans({ replaceSharedPlans: true });
     renderAll();
   });

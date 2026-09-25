@@ -45,3 +45,4 @@ next-env.d.ts
 /*-site.tar.gz
 /persistence-fix-site.tar.gz
 /site-package-*/
+/live-data-backup-*.json

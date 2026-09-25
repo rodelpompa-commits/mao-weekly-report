@@ -72,6 +72,8 @@ type WeeklyState = {
 };
 
 const weeklyStateKey = "mao-weekly-shared-state";
+const weeklyStateBackupKey = "mao-weekly-shared-state-backup-2026-09-25";
+const recordStoreMigrationKey = "mao-weekly-record-store-migrated-v1";
 const sessionDays = 7;
 const officialStaffAccounts = [
   ["Rodel L. Pompa", "1001"],
@@ -125,17 +127,13 @@ async function handleWeeklyState(request: Request, env: Env): Promise<Response> 
   }
 
   await ensureWeeklyTables(env.DB);
+  await ensureRecordStoreBackfilled(env.DB);
 
   if (request.method === "GET") {
     const session = await getSession(request, env.DB);
-    const row = await env.DB
-      .prepare("SELECT value FROM app_state WHERE key = ?")
-      .bind(weeklyStateKey)
-      .first<{ value: string }>();
-
-    const storedState = row ? JSON.parse(row.value) : null;
+    const storedState = await loadStoredState(env.DB);
     if (!session) {
-      const publicState = await stateForClient(env.DB, storedState, false);
+      const publicState = await stateForClient(env.DB, storedState, false, null);
       return jsonResponse({
         plans: [],
         deletedPlanIds: [],
@@ -145,7 +143,7 @@ async function handleWeeklyState(request: Request, env: Env): Promise<Response> 
         updatedAt: publicState.updatedAt,
       }, 200, request);
     }
-    return jsonResponse(await stateForClient(env.DB, storedState, session?.role === "admin"), 200, request);
+    return jsonResponse(await stateForClient(env.DB, storedState, session.role === "admin", session), 200, request);
   }
 
   if (request.method === "POST") {
@@ -154,13 +152,15 @@ async function handleWeeklyState(request: Request, env: Env): Promise<Response> 
     if (session.role === "viewer") return jsonResponse({ error: "Viewer accounts cannot change records." }, 403, request);
 
     const body = await request.json<WeeklyState>();
-    const nextState = await saveMergedWeeklyState(env.DB, body, session);
+    await saveRecordChanges(env.DB, body, session);
 
     if (session.role === "admin") {
       const requestedAccess = body.access && typeof body.access === "object" ? body.access : {};
       await replaceAuthAccounts(env.DB, requestedAccess);
+      await saveMetadataState(env.DB, body);
     }
-    return jsonResponse(await stateForClient(env.DB, nextState, session.role === "admin"), 200, request);
+    const storedState = await loadStoredState(env.DB);
+    return jsonResponse(await stateForClient(env.DB, storedState, session.role === "admin", session), 200, request);
   }
 
   return jsonResponse({ error: "Method not allowed." }, 405, request);
@@ -181,72 +181,130 @@ function recordTime(record: PlanRecord): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-function mergeWeeklyState(current: WeeklyState, incoming: WeeklyState, session: SessionInfo): WeeklyState {
-  const currentPlans = validPlans(current.plans);
-  const incomingPlans = validPlans(incoming.plans);
-  const currentById = new Map(currentPlans.map((plan) => [plan.id, plan]));
-  const incomingById = new Map(incomingPlans.map((plan) => [plan.id, plan]));
-  const deletedPlanIds = new Set(
-    Array.isArray(current.deletedPlanIds) ? current.deletedPlanIds.map(String).filter(Boolean) : []
-  );
-
-  const requestedDeletes = Array.isArray(incoming.deletedPlanIds)
-    ? incoming.deletedPlanIds.map(String).filter(Boolean)
-    : [];
-  requestedDeletes.forEach((id) => {
-    const owner = currentById.get(id)?.staffName || incomingById.get(id)?.staffName || "";
-    if (session.role === "admin" || owner === session.staffName) deletedPlanIds.add(id);
-  });
-
-  incomingPlans.forEach((plan) => {
-    if (session.role !== "admin" && plan.staffName !== session.staffName) return;
-    if (deletedPlanIds.has(plan.id)) return;
-    const existing = currentById.get(plan.id);
-    if (!existing || recordTime(plan) > recordTime(existing)) currentById.set(plan.id, plan);
-  });
-
-  deletedPlanIds.forEach((id) => currentById.delete(id));
-  const requestedAccess = incoming.access && typeof incoming.access === "object" ? incoming.access : {};
-  const currentAccess = current.access && typeof current.access === "object" ? current.access : {};
-  const currentSignatories = current.signatories && typeof current.signatories === "object" ? current.signatories : {};
-  const requestedSignatories = incoming.signatories && typeof incoming.signatories === "object" ? incoming.signatories : {};
-
-  return {
-    plans: [...currentById.values()],
-    deletedPlanIds: [...deletedPlanIds],
-    staff: session.role === "admin" && Array.isArray(incoming.staff) ? incoming.staff : current.staff || [],
-    access: session.role === "admin" ? sanitizeAccess(requestedAccess) : sanitizeAccess(currentAccess),
-    signatories: session.role === "admin" ? requestedSignatories : currentSignatories,
-    updatedAt: new Date().toISOString(),
-  };
+async function loadStoredState(db: D1Database): Promise<WeeklyState> {
+  const row = await db
+    .prepare("SELECT value FROM app_state WHERE key = ?")
+    .bind(weeklyStateKey)
+    .first<{ value: string }>();
+  if (!row?.value) return {};
+  try {
+    return JSON.parse(row.value) as WeeklyState;
+  } catch {
+    return {};
+  }
 }
 
-async function saveMergedWeeklyState(db: D1Database, incoming: WeeklyState, session: SessionInfo): Promise<WeeklyState> {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const row = await db
-      .prepare("SELECT value, updated_at FROM app_state WHERE key = ?")
-      .bind(weeklyStateKey)
-      .first<{ value: string; updated_at: string }>();
-    let current: WeeklyState = {};
-    if (row?.value) {
-      try {
-        current = JSON.parse(row.value) as WeeklyState;
-      } catch {
-        current = {};
-      }
+async function ensureRecordStoreBackfilled(db: D1Database): Promise<void> {
+  const migrated = await db
+    .prepare("SELECT 1 AS ready FROM app_state WHERE key = ?")
+    .bind(recordStoreMigrationKey)
+    .first<{ ready: number }>();
+  if (migrated) return;
+
+  const sourceRow = await db
+    .prepare("SELECT value, updated_at FROM app_state WHERE key = ?")
+    .bind(weeklyStateKey)
+    .first<{ value: string; updated_at: string }>();
+  let sourceState: WeeklyState = {};
+  if (sourceRow?.value) {
+    try {
+      sourceState = JSON.parse(sourceRow.value) as WeeklyState;
+    } catch {
+      sourceState = {};
     }
-    const nextState = mergeWeeklyState(current, incoming, session);
-    const nextUpdatedAt = `${nextState.updatedAt}-${crypto.randomUUID()}`;
-    const result = row
-      ? await db.prepare("UPDATE app_state SET value = ?, updated_at = ? WHERE key = ? AND updated_at = ?")
-        .bind(JSON.stringify(nextState), nextUpdatedAt, weeklyStateKey, row.updated_at)
-        .run()
-      : await db.prepare("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING")
-        .bind(weeklyStateKey, JSON.stringify(nextState), nextUpdatedAt)
-        .run();
-    if ((result.meta?.changes || 0) > 0) return nextState;
+    await db.prepare("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING")
+      .bind(weeklyStateBackupKey, sourceRow.value, sourceRow.updated_at)
+      .run();
   }
-  throw new Error("The records changed during saving. Please try again.");
+
+  const migrationTime = String(sourceState.updatedAt || sourceRow?.updated_at || new Date().toISOString()).split("-").slice(0, 3).join("-");
+  const normalizedMigrationTime = Number.isFinite(Date.parse(migrationTime)) ? migrationTime : new Date().toISOString();
+  const statements = validPlans(sourceState.plans).map((plan) => {
+    const createdAt = String(plan.createdAt || normalizedMigrationTime);
+    const updatedAt = String(plan.updatedAt || normalizedMigrationTime);
+    const migratedPlan = { ...plan, createdAt, updatedAt, migratedFromLegacy: true };
+    return db.prepare(
+      "INSERT INTO weekly_records (id, staff_name, payload, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, NULL) ON CONFLICT(id) DO NOTHING"
+    ).bind(plan.id, String(plan.staffName || ""), JSON.stringify(migratedPlan), createdAt, updatedAt);
+  });
+  const deletedAt = normalizedMigrationTime;
+  for (const id of Array.isArray(sourceState.deletedPlanIds) ? sourceState.deletedPlanIds : []) {
+    if (!id) continue;
+    statements.push(db.prepare(
+      "INSERT INTO weekly_records (id, staff_name, payload, created_at, updated_at, deleted_at) VALUES (?, '', ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET deleted_at = excluded.deleted_at"
+    ).bind(String(id), JSON.stringify({ id: String(id) }), deletedAt, deletedAt, deletedAt));
+  }
+  for (let index = 0; index < statements.length; index += 50) {
+    await db.batch(statements.slice(index, index + 50));
+  }
+
+  const metadataState: WeeklyState = {
+    staff: Array.isArray(sourceState.staff) ? sourceState.staff : [],
+    access: sourceState.access && typeof sourceState.access === "object" ? sanitizeAccess(sourceState.access) : {},
+    signatories: sourceState.signatories && typeof sourceState.signatories === "object" ? sourceState.signatories : {},
+    updatedAt: new Date().toISOString(),
+  };
+  await db.batch([
+    db.prepare("UPDATE app_state SET value = ?, updated_at = ? WHERE key = ?")
+      .bind(JSON.stringify(metadataState), metadataState.updatedAt, weeklyStateKey),
+    db.prepare("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING")
+      .bind(recordStoreMigrationKey, JSON.stringify({ migratedAt: metadataState.updatedAt, records: statements.length }), metadataState.updatedAt),
+  ]);
+}
+
+async function saveRecordChanges(db: D1Database, incoming: WeeklyState, session: SessionInfo): Promise<void> {
+  const actorName = session.role === "staff" ? session.staffName : session.role;
+  for (const plan of validPlans(incoming.plans)) {
+    if (session.role !== "admin" && plan.staffName !== session.staffName) continue;
+    const existing = await db.prepare("SELECT staff_name, payload, created_at, updated_at, deleted_at FROM weekly_records WHERE id = ?")
+      .bind(plan.id)
+      .first<{ staff_name: string; payload: string; created_at: string; updated_at: string; deleted_at: string | null }>();
+    if (existing && session.role !== "admin" && existing.staff_name !== session.staffName) continue;
+    if (existing?.deleted_at) continue;
+    const incomingTime = recordTime(plan);
+    if (existing && (!incomingTime || incomingTime <= Date.parse(existing.updated_at))) continue;
+    const now = new Date().toISOString();
+    const createdAt = String(plan.createdAt || existing?.created_at || now);
+    const updatedAt = String(plan.updatedAt || now);
+    const normalizedPlan = { ...plan, createdAt, updatedAt };
+    const result = await db.prepare(
+      "INSERT INTO weekly_records (id, staff_name, payload, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, NULL) ON CONFLICT(id) DO UPDATE SET staff_name = excluded.staff_name, payload = excluded.payload, updated_at = excluded.updated_at, deleted_at = NULL WHERE excluded.updated_at > weekly_records.updated_at AND weekly_records.deleted_at IS NULL"
+    ).bind(plan.id, String(plan.staffName || ""), JSON.stringify(normalizedPlan), createdAt, updatedAt).run();
+    if ((result.meta?.changes || 0) > 0) {
+      await db.prepare(
+        "INSERT INTO weekly_record_history (version_id, record_id, staff_name, operation, payload, actor_role, actor_name, saved_at, sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(crypto.randomUUID(), plan.id, String(plan.staffName || ""), existing ? "update" : "create", JSON.stringify(normalizedPlan), session.role, actorName, now, Date.now()).run();
+    }
+  }
+
+  for (const id of Array.isArray(incoming.deletedPlanIds) ? incoming.deletedPlanIds.map(String).filter(Boolean) : []) {
+    const existing = await db.prepare("SELECT staff_name, payload, deleted_at FROM weekly_records WHERE id = ?")
+      .bind(id)
+      .first<{ staff_name: string; payload: string; deleted_at: string | null }>();
+    if (!existing || existing.deleted_at) continue;
+    if (session.role !== "admin" && existing.staff_name !== session.staffName) continue;
+    const now = new Date().toISOString();
+    const result = await db.prepare("UPDATE weekly_records SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .bind(now, now, id).run();
+    if ((result.meta?.changes || 0) > 0) {
+      await db.prepare(
+        "INSERT INTO weekly_record_history (version_id, record_id, staff_name, operation, payload, actor_role, actor_name, saved_at, sequence) VALUES (?, ?, ?, 'delete', ?, ?, ?, ?, ?)"
+      ).bind(crypto.randomUUID(), id, existing.staff_name, existing.payload, session.role, actorName, now, Date.now()).run();
+    }
+  }
+}
+
+async function saveMetadataState(db: D1Database, incoming: WeeklyState): Promise<void> {
+  const current = await loadStoredState(db);
+  const updatedAt = new Date().toISOString();
+  const nextState: WeeklyState = {
+    staff: Array.isArray(incoming.staff) ? incoming.staff : current.staff || [],
+    access: incoming.access && typeof incoming.access === "object" ? sanitizeAccess(incoming.access) : sanitizeAccess(current.access || {}),
+    signatories: incoming.signatories && typeof incoming.signatories === "object" ? incoming.signatories : current.signatories || {},
+    updatedAt,
+  };
+  await db.prepare("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at")
+    .bind(weeklyStateKey, JSON.stringify(nextState), updatedAt).run();
 }
 
 async function handleLogin(request: Request, env: Env): Promise<Response> {
@@ -310,7 +368,12 @@ async function ensureWeeklyTables(db: D1Database): Promise<void> {
   ]);
 }
 
-async function stateForClient(db: D1Database, storedState: WeeklyState | null, includePasswords: boolean): Promise<WeeklyState> {
+async function stateForClient(
+  db: D1Database,
+  storedState: WeeklyState | null,
+  includePasswords: boolean,
+  session: SessionInfo | null,
+): Promise<WeeklyState> {
   const accounts = await db
     .prepare("SELECT name, password FROM auth_accounts WHERE role = 'staff' ORDER BY rowid")
     .all<{ name: string; password: string }>();
@@ -327,10 +390,37 @@ async function stateForClient(db: D1Database, storedState: WeeklyState | null, i
     adminPassword: includePasswords ? admin?.password || "" : "",
     viewerPassword: includePasswords ? viewer?.password || "" : "",
   };
+  let plans: PlanRecord[] = [];
+  let deletedPlanIds: string[] = [];
+  if (session) {
+    const records = session.role === "staff"
+      ? await db.prepare("SELECT id, payload, deleted_at FROM weekly_records WHERE staff_name = ? ORDER BY updated_at")
+        .bind(session.staffName)
+        .all<{ id: string; payload: string; deleted_at: string | null }>()
+      : await db.prepare("SELECT id, payload, deleted_at FROM weekly_records ORDER BY updated_at")
+        .all<{ id: string; payload: string; deleted_at: string | null }>();
+    for (const record of records.results || []) {
+      if (record.deleted_at) {
+        deletedPlanIds.push(record.id);
+        continue;
+      }
+      try {
+        const plan = JSON.parse(record.payload) as PlanRecord;
+        if (plan?.id) plans.push(plan);
+      } catch {
+        // A damaged record is omitted without preventing other staff records from loading.
+      }
+    }
+    if (session.role === "staff") {
+      const allDeleted = await db.prepare("SELECT id FROM weekly_records WHERE deleted_at IS NOT NULL")
+        .all<{ id: string }>();
+      deletedPlanIds = [...new Set([...deletedPlanIds, ...(allDeleted.results || []).map((row) => row.id)])];
+    }
+  }
 
   return {
-    plans: Array.isArray(storedState?.plans) ? storedState?.plans : [],
-    deletedPlanIds: Array.isArray(storedState?.deletedPlanIds) ? storedState.deletedPlanIds : [],
+    plans,
+    deletedPlanIds,
     staff: Array.isArray(storedState?.staff) && storedState.staff.length
       ? storedState.staff
       : staffAccounts.map((account) => account.name),
